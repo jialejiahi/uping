@@ -22,7 +22,7 @@ var (
 	CPort      int
 	PayloadLen int // default 64; 每个请求的负载长度
 	Interval   int //default 100, 单位ms
-	Count      int //发送报文的数量
+	Count      uint64 //发送报文的数量
 	Timeout    int //认为报文无应答的超时时间
 )
 
@@ -41,7 +41,7 @@ func init() {
 	flag.IntVar(&CPort, "p", 0, "Client Binding Port, Client Only")
 	flag.IntVar(&PayloadLen, "l", 64, "Payload Length, Client Only")
 	flag.IntVar(&Interval, "i", 100, "New Request Interval, Client Only")
-	flag.IntVar(&Count, "c", 10, "Requests per data socket, Client Only")
+	flag.Uint64Var(&Count, "c", 10, "Requests per data socket, Client Only")
 	flag.IntVar(&Timeout, "t", 1000, "Receive Response Timeout in ms, Client Only")
 }
 
@@ -63,13 +63,13 @@ func Usage() {
         服务端绑定的地址，服务端可选，客户端必填
   -P string
         Server Data Port List, format: 23456,23457
-        服务端监听的数据端口列表,客户端指定多个端口时, 将循环遍历接口列表
+        服务端监听的端口列表,客户端指定多个端口时,将循环遍历端口列表
   -s bool
         Run as server (default false)
         作为server运行,不指定则作为client运行
   -n name
-		Server Name, Get Hostname if it's not given
-        负载均衡场景用于区分多个server,不指定时获取系统Hostname
+        Server Name, Get Hostname if it's not given
+        服务端指定，用于客户端区分多个server,不指定时获取系统Hostname
   -b string
         Client Binding Address, Client Only (default "0.0.0.0")
         client端绑定的地址, 不指定则不绑定
@@ -78,13 +78,13 @@ func Usage() {
         client端绑定的端口，不绑定则每次发包使用随机值
   -l int
         Requests Length, Client Only (default 64)
-        数据请求报文的长度, 最小取值64字节, 以容纳包头
+        请求报文的长度, 最小取值64字节, 以容纳包头
   -i int
         Request Sending Interval, Client Only (default 100)
         发包间隔，单位毫秒，默认值100
   -c int
         Request Count, Client Only (default 10)
-        发起请求的个数, 如果不指定，则持续发送直到收到退出信号
+        请求个数, 如果不指定，则持续发送直到收到退出信号
   -t int
         Receive Timeout in ms, Client Only (default 1000)
         请求报文无应答的超时时间，单位毫秒，默认值1000
@@ -150,11 +150,11 @@ func main() {
 		}
 
 		if PayloadLen > MaxPktLen {
-			fmt.Println("Request len truncate to %d", MaxPktLen)
+			fmt.Printf("Request len truncate to %d\n", MaxPktLen)
 			PayloadLen = MaxPktLen
 		}
 		if PayloadLen < MinPktLen {
-			fmt.Println("Request at least %d, set to %d", MinPktLen, MinPktLen)
+			fmt.Printf("Request at least %d, set to %d\n", MinPktLen, MinPktLen)
 			PayloadLen = 64
 		}
 		client_main(saddr, caddr, plist)

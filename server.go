@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
 	"net"
 	"os"
@@ -9,27 +11,66 @@ import (
 	"syscall"
 )
 
-func RecvAndSend(wg *sync.WaitGroup, conn net.Conn) {
+func RecvAndSend(wg *sync.WaitGroup, conn *net.UDPConn) {
 	defer wg.Done()
 	for !Interrupted {
 		buf := make([]byte, MaxPktLen+128)
-		n, err := conn.Read(buf)
+		n, raddr, err := conn.ReadFromUDP(buf)
 		if err != nil {
 			fmt.Println("read error:", err)
-			return
+			continue
 		}
-		//handle one request parse recevied data and reply
-		go func(n int, buf []byte) {
-			if n > 0 {
-				fmt.Printf("recv: %s\n", buf[:n])
+		if n <= 0 {
+			continue
+		}
+		if Dbglvl > 1 {
+			fmt.Printf("%d bytes from %s\n", n, raddr.String())
+		}
+
+		if Dbglvl > 1 {
+			for i := 0; i < 64; i++ {
+				fmt.Printf("%02x ", buf[i])
 			}
-			if n == 0 {
-				return
+			fmt.Println("")
+		}
+		//parse request
+		req := ReqHeader{
+		    Id:	  binary.BigEndian.Uint32(buf[0:4]),
+			Seq:   binary.BigEndian.Uint64(buf[4:12]),
+		}
+		if Dbglvl > 1 {
+			fmt.Printf("Req is %v\n", req)
+		}
+		//make a reply
+		resp := RespHeader{
+			Id: req.Id,
+			Seq: req.Seq,
+			NameLen: uint32(len(Name)),
+		}
+
+		if Dbglvl > 1 {
+			fmt.Printf("Resp is %v\n", resp)
+		}
+		var rbuf bytes.Buffer
+		binary.Write(&rbuf, binary.BigEndian, &resp)
+		binary.Write(&rbuf, binary.BigEndian, []byte(Name))
+		binary.Write(&rbuf, binary.BigEndian, buf[16+resp.NameLen:n])
+		rbufBytes := rbuf.Bytes()
+		if Dbglvl > 1 {
+			for i := 0; i < 64; i++ {
+				fmt.Printf("%02x ", rbufBytes[i])
 			}
-			//parse request
-			//make a reply
-			conn.Write(buf[:n])
-		}(n, buf)
+			fmt.Println("")
+		}
+
+		n, err = conn.WriteToUDP(rbuf.Bytes(), raddr)
+		if err != nil {
+			fmt.Println("write error:", err)
+			continue
+		}
+		if Dbglvl > 1 {
+			fmt.Printf("Send %d bytes to %s\n", n, raddr.String())
+		}
 	}
 }
 
@@ -40,6 +81,13 @@ func RecvAndSend(wg *sync.WaitGroup, conn net.Conn) {
 // Name: server name
 func server_main(saddr net.IP, plist []uint16) {
 	// create server socket
+	if Name == "" {
+		Name, _ = os.Hostname()
+	}
+	if len(Name) > 48 {
+		Name = Name[:48]	
+		fmt.Printf("Server name too long, truncated to %s\n", Name)
+	}
 	if Dbglvl > 0 {
 		fmt.Printf("listening %s:%s, response with name %s\n", SAddr, SPortList, Name)
 	}
@@ -52,6 +100,7 @@ func server_main(saddr net.IP, plist []uint16) {
 			return
 		}
 		conns = append(conns, conn)
+		defer conn.Close()
 	}
 	//handle
 	Interrupted = false
@@ -72,7 +121,7 @@ func server_main(saddr net.IP, plist []uint16) {
 	// receive and response
 	for _, conn := range conns {
 		wg.Add(1)
-		RecvAndSend(&wg, conn)
+		go RecvAndSend(&wg, conn)
 	}
 	wg.Wait()
 
