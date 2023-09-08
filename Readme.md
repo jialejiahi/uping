@@ -62,17 +62,34 @@ examples：
 
 ```bash
 # 1. 类似ping的简单使用方式, 客户端访问服务端的23456， 23457 接口
-./uping -s
+./uping -s &
 ./uping -B 127.0.0.1
 
-# server端监听两个端口，并设置名称为server1
-./uping -s -B 10.0.32.12 -P 22222,33333 -name server1
-./uping -s -B 10.0.32.133 -P 22222,33333 -name server2
+# 配置lb监听器，ip地址10.0.32.172，端口13579
+# 后端绑定两个rs， 10.0.32.75 10.0.32.178
+# lb的两个rs server端分别监听两个端口
+./uping -s -B 10.0.32.75 -P 22222,33333 -n server1
+./uping -s -B 10.0.32.178 -P 22222,33333 -n server2
 
-# 访问lb监听器的地址和端口，指定报文长度为256， 发送间隔1毫秒
-./uping -B 10.0.32.99 -P 12345 -l 256 -i 1 -c 100 -t 100 -m
+# client访问lb监听器的地址和端口，指定报文长度为256， 发送间隔1毫秒
+./uping -B 10.0.32.172 -P 13579 -c 1000 -m -l 2560 -t 100 -i 1
 ```
+示例输出
+```
+...
+2560 bytes from 10.0.32.172:13579(server2): seq=985 time=247.408µs2560 bytes from 10.0.32.172:13579(server1): seq=986 time=253.425µs
+2560 bytes from 10.0.32.172:13579(server1): seq=987 time=256.189µs2560 bytes from 10.0.32.172:13579(server1): seq=988 time=268.701µs
+2560 bytes from 10.0.32.172:13579(server2): seq=989 time=237.982µs2560 bytes from 10.0.32.172:13579(server2): seq=990 time=239.375µs
+2560 bytes from 10.0.32.172:13579(server1): seq=991 time=238.659µs2560 bytes from 10.0.32.172:13579(server1): seq=992 time=249.796µs
+2560 bytes from 10.0.32.172:13579(server2): seq=993 time=244.983µs2560 bytes from 10.0.32.172:13579(server1): seq=994 time=259.84µs
+2560 bytes from 10.0.32.172:13579(server2): seq=995 time=235.944µs2560 bytes from 10.0.32.172:13579(server1): seq=996 time=241.057µs
+2560 bytes from 10.0.32.172:13579(server2): seq=997 time=242.781µs2560 bytes from 10.0.32.172:13579(server2): seq=998 time=247.148µs
+2560 bytes from 10.0.32.172:13579(server2): seq=999 time=270.459µs
+--- 10.0.32.172:13579 uping statistics ---1000 packets transmitted, 1000 received, 0 packet loss
+successful requests rtt avg/max = 293.519µs/23.718467mslb statistics for each rs name:
+server1: 498 received, rtt avg/max = 283.795µs/1.792277msserver2: 502 received, rtt avg/max = 303.167µs/23.718467ms
 
+```
 # 统计信息
 
 1. 服务端打印收到了客户端的包
