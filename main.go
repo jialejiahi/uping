@@ -78,9 +78,9 @@ func Usage() {
   -p int
         Client Binding Port, Client Only (default 0)
         client端绑定的端口，不绑定则每次发包使用随机值
-  -m mutable source port
-        Client Mutable Source Port, Client Only (default true)
-        客户端的端口随机变化, 默认true
+  -m bool
+        Client Mutable Source Port, Client Only (default false)
+        客户端的端口随机变化, 默认false
   -l int
         Requests Length, Client Only (default 64)
         请求报文的长度, 最小取值64字节, 以容纳包头
