@@ -62,7 +62,7 @@ func Usage() {
         调试级别,0. 不打印调试信息 1. 基本输出 2. 详细输出
   -B string
         Server Binding Address, must if run as client (default "0.0.0.0")
-        服务端绑定的地址，服务端可选，客户端必填
+        服务端绑定的地址,服务端可选,客户端必填
   -P string
         Server Data Port List, format: 23456,23457
         服务端监听的端口列表,客户端指定多个端口时,将循环遍历端口列表
@@ -71,13 +71,13 @@ func Usage() {
         作为server运行,不指定则作为client运行
   -n name
         Server Name, Get Hostname if it's not given
-        服务端指定，用于客户端区分多个server,不指定时获取系统Hostname
+        服务端指定,用于客户端区分多个server,不指定时获取系统Hostname
   -b string
         Client Binding Address, Client Only (default "0.0.0.0")
         client端绑定的地址, 不指定则不绑定
   -p int
         Client Binding Port, Client Only (default 0)
-        client端绑定的端口，不绑定则每次发包使用随机值
+        client端绑定的端口,不绑定则每次发包使用随机值
   -m bool
         Client Mutable Source Port, Client Only (default false)
         客户端的端口随机变化, 默认false
@@ -86,13 +86,13 @@ func Usage() {
         请求报文的长度, 最小取值64字节, 以容纳包头
   -i int
         Request Sending Interval, Client Only (default 100)
-        发包间隔，单位毫秒，默认值100
+        发包间隔,单位毫秒,默认值100
   -c int
         Request Count, Client Only (default 10)
-        请求个数, 如果不指定，则持续发送直到收到退出信号
+        请求个数, 如果不指定,则持续发送直到收到退出信号
   -t int
         Receive Timeout in ms, Client Only (default 1000)
-        请求报文无应答的超时时间，单位毫秒，默认值1000
+        请求报文无应答的超时时间,单位毫秒,默认值1000
 `
 	fmt.Print(str)
 }
