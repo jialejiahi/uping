@@ -76,7 +76,22 @@ examples：
 ```
 示例输出
 ```bash
+2560 bytes from 10.0.32.172:13579(server1): seq=991 time=245.23µs
+2560 bytes from 10.0.32.172:13579(server1): seq=992 time=237.1µs
+2560 bytes from 10.0.32.172:13579(server1): seq=993 time=246.592µs
+2560 bytes from 10.0.32.172:13579(server2): seq=994 time=290.818µs
+2560 bytes from 10.0.32.172:13579(server1): seq=995 time=231.009µs
+2560 bytes from 10.0.32.172:13579(server1): seq=996 time=252.372µs
+2560 bytes from 10.0.32.172:13579(server1): seq=997 time=234.761µs
+2560 bytes from 10.0.32.172:13579(server2): seq=998 time=252.566µs
+2560 bytes from 10.0.32.172:13579(server2): seq=999 time=254.894µs
 
+--- 10.0.32.172:13579 uping statistics ---
+1000 packets transmitted, 1000 received, 0 packet loss
+successful requests rtt avg/max = 276.687µs/5.258831ms
+lb statistics for each rs name:
+server1: 499 received, rtt avg/max = 294.33µs/5.258831ms
+server2: 501 received, rtt avg/max = 259.114µs/920.341µs
 ```
 # 统计信息
 
