@@ -20,6 +20,7 @@ var (
 	Name       string //server name, default is hostname
 	CAddr      string
 	CPort      int
+	MutSport   bool
 	PayloadLen int // default 64; 每个请求的负载长度
 	Interval   int //default 100, 单位ms
 	Count      uint64 //发送报文的数量
@@ -39,6 +40,7 @@ func init() {
 
 	flag.StringVar(&CAddr, "b", "0.0.0.0", "Client Binding Address, Client Only")
 	flag.IntVar(&CPort, "p", 0, "Client Binding Port, Client Only")
+	flag.BoolVar(&MutSport, "m", false, "Mutable Source Port, Client Only")
 	flag.IntVar(&PayloadLen, "l", 64, "Payload Length, Client Only")
 	flag.IntVar(&Interval, "i", 100, "New Request Interval, Client Only")
 	flag.Uint64Var(&Count, "c", 10, "Requests per data socket, Client Only")
@@ -76,6 +78,9 @@ func Usage() {
   -p int
         Client Binding Port, Client Only (default 0)
         client端绑定的端口，不绑定则每次发包使用随机值
+  -m mutable source port
+        Client Mutable Source Port, Client Only (default true)
+        客户端的端口随机变化, 默认true
   -l int
         Requests Length, Client Only (default 64)
         请求报文的长度, 最小取值64字节, 以容纳包头
@@ -107,6 +112,24 @@ func GetPortList(pliststr string) (plist []uint16, err error) {
 		}
 	}
 	return
+}
+
+func set_socket_buf_size() {
+	f, err := os.OpenFile("/proc/sys/net/core/rmem_max", os.O_RDWR, 0)
+	if err != nil {
+		fmt.Printf("open /proc/sys/net/core/rmem_max error: %s", err.Error())
+		return	
+	}
+	defer f.Close()
+	f.WriteString("2097152")
+
+	f, err = os.OpenFile("/proc/sys/net/core/rmem_default", os.O_RDWR, 0)
+	if err != nil {
+		fmt.Printf("open /proc/sys/net/core/rmem_default error: %s", err.Error())
+		return	
+	}
+	defer f.Close()
+	f.WriteString("2097152")
 }
 
 func main() {
@@ -157,6 +180,7 @@ func main() {
 			fmt.Printf("Request at least %d, set to %d\n", MinPktLen, MinPktLen)
 			PayloadLen = 64
 		}
+		set_socket_buf_size()
 		client_main(saddr, caddr, plist)
 
 	} else {
@@ -166,6 +190,7 @@ func main() {
 			Usage()
 			return
 		}
+		set_socket_buf_size()
 		server_main(saddr, plist)
 	}
 }

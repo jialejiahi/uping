@@ -11,59 +11,75 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"golang.org/x/sys/unix"
 )
 
-var stat Stat
-var statServerSlice = []StatPerServer{}
-var statServerSliceLock sync.Mutex
+var ID uint32 = 0
+var serverStatSlice = []StatPerServer{}
+var serverStatSliceLock sync.Mutex
 
+func Control(network, address string, c syscall.RawConn) error {
+	var err error
+	c.Control(func(fd uintptr) {
+		err = unix.SetsockoptInt(int(fd), unix.SOL_SOCKET, unix.SO_REUSEADDR, 1)
+		if err != nil {
+			return
+		}
 
+		err = unix.SetsockoptInt(int(fd), unix.SOL_SOCKET, unix.SO_REUSEPORT, 1)
+		if err != nil {
+			return
+		}
+	})
+	return err
+}
 // use a slice, struct in map can not be changed
-func get_stat_for_server(addr string, name string) int {
-	statServerSliceLock.Lock()
-	defer statServerSliceLock.Unlock()
-	for i, v := range statServerSlice {
-		if v.Name == name && v.Addr == addr {
+func get_stat_for_name(server_index int, name string) int {
+	serverStatSliceLock.Lock()
+	defer serverStatSliceLock.Unlock()
+	for i, v := range serverStatSlice[server_index].StatPerNames {
+		if v.Name == name {
 			return i
 		}
 	}
-	statServerSlice = append(statServerSlice, StatPerServer{
-		Addr: addr,
+	serverStatSlice[server_index].StatPerNames = append(serverStatSlice[server_index].StatPerNames, StatPerName{
 		Name: name,
-		RespStats: []*RespStat{},
+		RespStats: []RespStat{},
 		RespLock: &sync.RWMutex{},
 	})
-	return len(statServerSlice) - 1
+	return len(serverStatSlice[server_index].StatPerNames) - 1
 }
 
-func SendOne(conn *net.UDPConn, seq uint64, payload []byte) error {
+func SendOne(sindex int, c *net.UDPConn, seq uint64, payload []byte) (err error) {
 //construct and send one packet
+
 	var buf bytes.Buffer
 	req := ReqHeader {
-		Id: stat.Id,
+		Id: ID,
 		Seq: seq,
 	}
 	binary.Write(&buf, binary.BigEndian, &req)
 	binary.Write(&buf, binary.BigEndian, payload[:])
 
-	n, err := conn.Write(buf.Bytes());
+	n, err := c.Write(buf.Bytes());
 	if err != nil {
 		fmt.Println(err)
 		return err
 	}
 	timeStamp := time.Now()
+	serverStatSlice[sindex].ReqLock.Lock()
+	serverStatSlice[sindex].ReqStats[seq].TimeStamp = timeStamp
+	serverStatSlice[sindex].ReqLock.Unlock()
 	if Dbglvl > 1 {
 		fmt.Printf("Sent %d bytes to %s: seq=%d timestamp=%s\n",
-			n, conn.RemoteAddr().String(), seq, timeStamp.Format(time.StampMilli))
+			n, c.RemoteAddr().String(), seq, timeStamp.Format(time.StampMilli))
 	}
-	stat.ReqLock.Lock()
-	stat.ReqStats[seq].TimeStamp = timeStamp
-	stat.ReqLock.Unlock()
 
 	return nil
 }
 
-func RecvOne(conn *net.UDPConn) error {
+func RecvOne(sindex int, conn *net.UDPConn) error {
 	buf := make([]byte, MaxPktLen+128)
 	conn.SetReadDeadline(time.Now().Add(time.Duration(Timeout) * time.Millisecond))
 	n, addr, err := conn.ReadFromUDP(buf)
@@ -82,25 +98,25 @@ func RecvOne(conn *net.UDPConn) error {
 	}
 
 	if Dbglvl > 1 {
-		fmt.Printf("Resp is %v\n", resp)
+		fmt.Printf("Resp header is %v\n", resp)
 	}
 	name := string(buf[16:16+resp.NameLen])
 
 	//sequence is index
-	rtt := time.Since(stat.ReqStats[resp.Seq].TimeStamp)
+	rtt := time.Since(serverStatSlice[sindex].ReqStats[resp.Seq].TimeStamp)
 	respStat := RespStat {
 		Seq: resp.Seq,
 		TimeStamp: time.Now(),
 		Rtt: rtt,
 	}
-	i := get_stat_for_server(addr.String(), name)
-	statServerSlice[i].RespLock.Lock()
-	statServerSlice[i].RespStats = append(statServerSlice[i].RespStats, &respStat)
-	statServerSlice[i].RespLock.Unlock()
+	i := get_stat_for_name(sindex, name)
+	serverStatSlice[sindex].StatPerNames[i].RespLock.Lock()
+	serverStatSlice[sindex].StatPerNames[i].RespStats = append(serverStatSlice[sindex].StatPerNames[i].RespStats, respStat)
+	serverStatSlice[sindex].StatPerNames[i].RespLock.Unlock()
 
-	stat.ReqLock.Lock()
-	stat.ReqStats[resp.Seq].RespStatPtr = &respStat
-	stat.ReqLock.Unlock()
+	serverStatSlice[sindex].ReqLock.Lock()
+	serverStatSlice[sindex].ReqStats[resp.Seq].RespStatPtr = &respStat
+	serverStatSlice[sindex].ReqLock.Unlock()
 
 	if Dbglvl > 0 {
 		fmt.Printf("%d bytes from %s(%s): seq=%d time=%s\n",
@@ -114,82 +130,126 @@ func RecvOne(conn *net.UDPConn) error {
 //rtt min/avg/max/mdev = 0.015/0.020/0.026/0.006 ms
 func get_all_stats() {
 
-	fmt.Println()
-	fmt.Println("--- uping statistics ---")
-	maxRtt := time.Duration(0)
-	totalRtt := time.Duration(0)
-	respCnt := 0
-	lostCnt := 0
-	for i, reqStat := range stat.ReqStats {
-		if i != int(reqStat.Seq) {
-			fmt.Printf("seq=%d not equal slice index %d", reqStat.Seq, i)	
-		}
-		if reqStat.RespStatPtr != nil {
-			if Dbglvl > 1 {
-				fmt.Printf("seq=%d time=%s\n", reqStat.Seq, reqStat.RespStatPtr.Rtt.String())
-			}
-			totalRtt += reqStat.RespStatPtr.Rtt
-			if reqStat.RespStatPtr.Rtt > maxRtt {
-				maxRtt = reqStat.RespStatPtr.Rtt
-			}
-			respCnt++
+	for _, s := range serverStatSlice {
+		if len(s.StatPerNames) > 1 {
+			fmt.Printf("\n---%s:%d uping statistics ---\n", s.Saddr, s.Sport)
+		} else if len(s.StatPerNames) == 1 {
+			fmt.Printf("\n--- %s:%d(%s) uping statistics ---\n", s.Saddr, s.Sport, s.StatPerNames[0].Name)
 		} else {
-			if Dbglvl > 1 {
-				fmt.Printf("seq=%d packet lost\n", reqStat.Seq)
-			}
-			lostCnt++
+			fmt.Printf("\n---%s:%d uping statistics ---\n", s.Saddr, s.Sport)
+			fmt.Printf("0 received, 100%% packet loss\n")
+			continue
 		}
-	}
-	fmt.Printf("%d packets transmitted, %d received, %d packet loss\n", len(stat.ReqStats), respCnt, lostCnt)
-	fmt.Printf("rtt avg/max = %s/%s\n", totalRtt/time.Duration(respCnt), maxRtt)
-
-	for _, serverStat := range statServerSlice {
-	    respCnt := 0
-		maxRtt := time.Duration(0)
-		totalRtt := time.Duration(0)
-		for _, respStat := range serverStat.RespStats {
-			totalRtt += respStat.Rtt
-			if respStat.Rtt > maxRtt {
-				maxRtt = respStat.Rtt
+		for i, reqStat := range s.ReqStats {
+			if i != int(reqStat.Seq) {
+				fmt.Printf("seq=%d not equal slice index %d", reqStat.Seq, i)	
 			}
-			respCnt++
+			if reqStat.RespStatPtr != nil {
+				if Dbglvl > 1 {
+					fmt.Printf("seq=%d time=%s\n", reqStat.Seq, reqStat.RespStatPtr.Rtt.String())
+				}
+				s.TotalRtt += reqStat.RespStatPtr.Rtt
+				if reqStat.RespStatPtr.Rtt > s.MaxRtt {
+					s.MaxRtt = reqStat.RespStatPtr.Rtt
+				}
+				s.RespNum++
+			} else {
+				if Dbglvl > 1 {
+					fmt.Printf("seq=%d packet lost\n", reqStat.Seq)
+				}
+				s.LostNum++
+			}
 		}
-		if respCnt > 0 {
-			fmt.Printf("%s(%s) %d received, rtt avg/max = %s/%s\n",
-					serverStat.Addr, serverStat.Name, respCnt, totalRtt/time.Duration(respCnt), maxRtt)
+		fmt.Printf("%d packets transmitted, %d received, %d packet loss\n", len(s.ReqStats), s.RespNum, s.LostNum)
+		fmt.Printf("successful requests rtt avg/max = %s/%s\n", s.TotalRtt/time.Duration(s.RespNum), s.MaxRtt)
+		if s.LostNum > 0 {
+			fmt.Printf("estimate network failure time: %s\n", time.Duration(s.LostNum) * time.Duration(Interval) * time.Millisecond)
+		}
+		if len(s.StatPerNames) > 1 {
+			fmt.Printf("lb statistics for each rs name:\n")
+			for _, stat := range s.StatPerNames {
+				respCnt := 0
+				maxRtt := time.Duration(0)
+				totalRtt := time.Duration(0)
+				for _, respStat := range stat.RespStats {
+					totalRtt += respStat.Rtt
+					if respStat.Rtt > maxRtt {
+						maxRtt = respStat.Rtt
+					}
+					respCnt++
+				}
+				if respCnt > 0 {
+					fmt.Printf("%s: %d received, rtt avg/max = %s/%s\n",
+							stat.Name, respCnt, totalRtt/time.Duration(respCnt), maxRtt)
+				}	
+			}
 		}
 	}
 }
 
-func SendAndRecv(conns []*net.UDPConn) {
+func SendAndRecvPerServer(wg *sync.WaitGroup, caddr net.IP, sindex int) {
+	defer wg.Done()
 
+	var seq uint64 = 0
+	var err error = nil
+	var c *net.UDPConn = nil
+	if !MutSport {
+		d := net.Dialer{
+			Control: Control,
+			LocalAddr: &net.UDPAddr{IP: caddr, Port: CPort},
+		}
+		raddr := &net.UDPAddr{IP: serverStatSlice[sindex].Saddr, Port: serverStatSlice[sindex].Sport}
+		cc, err := d.Dial("udp", raddr.String())
+		//c, err = net.DialUDP("udp", &net.UDPAddr{IP: caddr, Port: CPort},
+		//	  &net.UDPAddr{IP: serverStatSlice[sindex].Saddr, Port: serverStatSlice[sindex].Sport})
+		//c, err = net.DialUDP("udp", &net.UDPAddr{IP: caddr, Port: CPort},
+		//	  &net.UDPAddr{IP: serverStatSlice[sindex].Saddr, Port: serverStatSlice[sindex].Sport})	
+		if err != nil {
+			fmt.Printf("dial error: %s\n", err)
+			return
+		}
+		c = cc.(*net.UDPConn)
+		defer c.Close()
+	}
 	var payload = make([]byte, PayloadLen-12)
 	rand.Read(payload[:])
 
-	var seq uint64 = 0
 	for seq < Count {
-		for _, c := range conns {
-			if Interrupted {
-				break	
-			}
-			if seq >= Count {
-				break
-			}
-
-			stat.ReqLock.Lock()
-			stat.ReqStats = append(stat.ReqStats, ReqStat{
-				Seq: seq,
-				RespStatPtr: nil,
-			})
-			stat.ReqLock.Unlock()
-
-			go SendOne(c, seq, payload)
-			go RecvOne(c)
-			time.Sleep(time.Duration(Interval) * time.Millisecond)
-			seq++
+		if Interrupted {
+			break	
 		}
+		if seq >= Count {
+			break
+		}
+
+		serverStatSlice[sindex].ReqLock.Lock()
+		if seq != uint64(len(serverStatSlice[sindex].ReqStats)) {
+			fmt.Printf("seq %d not equal len(ReqStats) %d\n", seq, len(serverStatSlice[sindex].ReqStats))
+			return
+		}
+		serverStatSlice[sindex].ReqStats = append(serverStatSlice[sindex].ReqStats, ReqStat{
+			Seq: seq,
+			RespStatPtr: nil,
+		})
+		serverStatSlice[sindex].ReqLock.Unlock()
+		if MutSport {
+			c, err = net.DialUDP("udp", &net.UDPAddr{IP: caddr },
+				  &net.UDPAddr{IP: serverStatSlice[sindex].Saddr, Port: serverStatSlice[sindex].Sport})	
+			if err != nil {
+				fmt.Printf("dial error: %s\n", err)
+				return
+			}
+			go SendOne(sindex, c, seq, payload)
+			go RecvOne(sindex, c)
+			defer c.Close()
+		} else {
+			go SendOne(sindex, c, seq, payload)
+			go RecvOne(sindex, c)
+		}
+
+		time.Sleep(time.Duration(Interval) * time.Millisecond)
+		seq++
 	}
-	get_all_stats()
 }
 
 
@@ -211,8 +271,7 @@ func client_main(saddr net.IP, caddr net.IP, plist []uint16) {
 		fmt.Printf("Params Payload Len:%d, Inteval:%d, Count:%d, Timeout:%d\n",
 			PayloadLen, Interval, Count, Timeout)
 	}
-	stat.Id = rand.Uint32()	
-	stat.ReqLock = &sync.RWMutex{}
+	ID = rand.Uint32()	
 	//handle
 	Interrupted = false
 	c := make(chan os.Signal, 1)
@@ -232,24 +291,27 @@ func client_main(saddr net.IP, caddr net.IP, plist []uint16) {
 	}()
 
 
-	conns := []*net.UDPConn{}
+	var wg sync.WaitGroup
 	for _, p := range plist {
-		c, err := net.DialUDP("udp", &net.UDPAddr{IP: caddr, Port: CPort}, &net.UDPAddr{IP: saddr, Port: int(p)})	
-		if err != nil {
-			fmt.Printf("dial error: %s\n", err)
-			return
+		serverStat := StatPerServer{
+			Saddr: saddr,
+			Sport: int(p),
+			ReqNum: 0,
+			RespNum: 0,
+			LostNum: 0,
+			TotalRtt: time.Duration(0),
+			MaxRtt: time.Duration(0),
+			AvgRtt: time.Duration(0),
+			ReqStats: []ReqStat{},
+			ReqLock: &sync.RWMutex{},
 		}
-		conns = append(conns, c)
-		defer c.Close()
+		serverStatSlice = append(serverStatSlice, serverStat)
+		sindex := len(serverStatSlice) - 1
+
+		wg.Add(1)
+		go SendAndRecvPerServer(&wg, caddr, sindex)
 	}
-	//var wg sync.WaitGroup
-	//for _, c := range conns {
-	//	wg.Add(1)
-	//	go Recv(&wg, c)
-	//}
+	wg.Wait()
+	get_all_stats()
 
-	//wg.Add(1)
-	SendAndRecv(conns)
-
-	//wg.Wait()
 }
