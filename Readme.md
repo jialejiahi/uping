@@ -86,8 +86,10 @@ examples：
 2560 bytes from 10.0.32.172:13579(server2): seq=997 time=242.781µs2560 bytes from 10.0.32.172:13579(server2): seq=998 time=247.148µs
 2560 bytes from 10.0.32.172:13579(server2): seq=999 time=270.459µs
 --- 10.0.32.172:13579 uping statistics ---1000 packets transmitted, 1000 received, 0 packet loss
-successful requests rtt avg/max = 293.519µs/23.718467mslb statistics for each rs name:
-server1: 498 received, rtt avg/max = 283.795µs/1.792277msserver2: 502 received, rtt avg/max = 303.167µs/23.718467ms
+successful requests rtt avg/max = 293.519µs/23.718467ms
+lb statistics for each rs name:
+server1: 498 received, rtt avg/max = 283.795µs/1.792277ms
+server2: 502 received, rtt avg/max = 303.167µs/23.718467ms
 
 ```
 # 统计信息
