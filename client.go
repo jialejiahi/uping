@@ -52,9 +52,7 @@ func get_stat_for_name(server_index int, name string) int {
 }
 
 //construct and send one packet
-func SendOne(wg *sync.WaitGroup, sindex int, c *net.UDPConn, seq uint64, payload []byte) (err error) {
-	defer wg.Done()
-
+func SendOne(sindex int, c *net.UDPConn, seq uint64, payload []byte) (err error) {
 	var buf bytes.Buffer
 	req := ReqHeader {
 		Id: ID,
@@ -143,6 +141,7 @@ func get_all_stats() {
 			fmt.Printf("0 received, 100%% packet loss\n")
 			continue
 		}
+		var maxRttSeq uint64 = 0
 		for i, reqStat := range s.ReqStats {
 			if i != int(reqStat.Seq) {
 				fmt.Printf("seq=%d not equal slice index %d", reqStat.Seq, i)	
@@ -154,6 +153,7 @@ func get_all_stats() {
 				s.TotalRtt += reqStat.RespStatPtr.Rtt
 				if reqStat.RespStatPtr.Rtt > s.MaxRtt {
 					s.MaxRtt = reqStat.RespStatPtr.Rtt
+					maxRttSeq = reqStat.Seq
 				}
 				s.RespNum++
 			} else {
@@ -164,7 +164,15 @@ func get_all_stats() {
 			}
 		}
 		fmt.Printf("%d packets transmitted, %d received, %d packet loss\n", len(s.ReqStats), s.RespNum, s.LostNum)
-		fmt.Printf("successful requests rtt avg/max = %s/%s\n", s.TotalRtt/time.Duration(s.RespNum), s.MaxRtt)
+		if s.RespNum > 0 {
+			//TotalRtt may overflow
+			for _, reqStat := range s.ReqStats {
+				if reqStat.RespStatPtr != nil {
+					s.AvgRtt += reqStat.RespStatPtr.Rtt/time.Duration(s.RespNum)
+				}
+			}
+			fmt.Printf("successful requests rtt avg/max = %s/%s, max rtt seq is %d\n", s.AvgRtt, s.MaxRtt, maxRttSeq)
+		}
 		if s.LostNum > 0 {
 			fmt.Printf("estimate network failure time: %s\n", time.Duration(s.LostNum) * time.Duration(Interval) * time.Millisecond)
 		}
@@ -174,16 +182,25 @@ func get_all_stats() {
 				respCnt := 0
 				maxRtt := time.Duration(0)
 				totalRtt := time.Duration(0)
+				avgRtt := time.Duration(0)
+				var maxRttSeq uint64 = 0
 				for _, respStat := range stat.RespStats {
 					totalRtt += respStat.Rtt
 					if respStat.Rtt > maxRtt {
 						maxRtt = respStat.Rtt
+						maxRttSeq = respStat.Seq
 					}
 					respCnt++
 				}
 				if respCnt > 0 {
-					fmt.Printf("%s: %d received, rtt avg/max = %s/%s\n",
-							stat.Name, respCnt, totalRtt/time.Duration(respCnt), maxRtt)
+					//totalRtt may overflow
+					for _, respStat := range stat.RespStats {
+						if respStat.Rtt > 0 {
+							avgRtt += respStat.Rtt / time.Duration(respCnt)
+						}
+					}
+					fmt.Printf("%s: %d received, rtt avg/max = %s/%s, max rtt seq is %d\n",
+							stat.Name, respCnt, avgRtt, maxRtt, maxRttSeq)
 				}	
 			}
 		}
@@ -226,16 +243,6 @@ func SendAndRecvPerServer(wg *sync.WaitGroup, caddr net.IP, sindex int) {
 			break
 		}
 
-		serverStatSlice[sindex].ReqLock.Lock()
-		if seq != uint64(len(serverStatSlice[sindex].ReqStats)) {
-			fmt.Printf("seq %d not equal len(ReqStats) %d\n", seq, len(serverStatSlice[sindex].ReqStats))
-			return
-		}
-		serverStatSlice[sindex].ReqStats = append(serverStatSlice[sindex].ReqStats, ReqStat{
-			Seq: seq,
-			RespStatPtr: nil,
-		})
-		serverStatSlice[sindex].ReqLock.Unlock()
 		if MutSport {
 			c, err = net.DialUDP("udp", &net.UDPAddr{IP: caddr },
 				  &net.UDPAddr{IP: serverStatSlice[sindex].Saddr, Port: serverStatSlice[sindex].Sport})	
@@ -243,21 +250,37 @@ func SendAndRecvPerServer(wg *sync.WaitGroup, caddr net.IP, sindex int) {
 				fmt.Printf("dial error: %s\n", err)
 				return
 			}
-			defer c.Close()
 
-			wg1.Add(1)
-			go SendOne(&wg1, sindex, c, seq, payload)
+		}
+		defer c.Close()
+		send_and_recv := func () {
+			if seq != uint64(len(serverStatSlice[sindex].ReqStats)) {
+				fmt.Printf("seq %d not equal len(ReqStats) %d\n", seq, len(serverStatSlice[sindex].ReqStats))
+				return
+			}
+			serverStatSlice[sindex].ReqLock.Lock()
+			serverStatSlice[sindex].ReqStats = append(serverStatSlice[sindex].ReqStats, ReqStat{
+				Seq: seq,
+				RespStatPtr: nil,
+			})
+			serverStatSlice[sindex].ReqLock.Unlock()
+
+			SendOne(sindex, c, seq, payload)
 			wg1.Add(1)
 			go RecvOne(&wg1, sindex, c)
+			seq++
+		}
+		if Interval >= 10 {
+			send_and_recv()
+			time.Sleep(time.Duration(Interval) * time.Millisecond)
 		} else {
-			wg1.Add(1)
-			go SendOne(&wg1, sindex, c, seq, payload)
-			wg1.Add(1)
-			go RecvOne(&wg1, sindex, c)
+			//burst 10 packets
+			for i := 0; i < 10; i++ {
+				send_and_recv()
+			}
+			time.Sleep(time.Duration(Interval) * time.Millisecond * 10)
 		}
 
-		time.Sleep(time.Duration(Interval) * time.Millisecond)
-		seq++
 	}
 	wg1.Wait()
 }
