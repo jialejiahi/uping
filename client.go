@@ -51,8 +51,9 @@ func get_stat_for_name(server_index int, name string) int {
 	return len(serverStatSlice[server_index].StatPerNames) - 1
 }
 
-func SendOne(sindex int, c *net.UDPConn, seq uint64, payload []byte) (err error) {
 //construct and send one packet
+func SendOne(wg *sync.WaitGroup, sindex int, c *net.UDPConn, seq uint64, payload []byte) (err error) {
+	defer wg.Done()
 
 	var buf bytes.Buffer
 	req := ReqHeader {
@@ -79,7 +80,9 @@ func SendOne(sindex int, c *net.UDPConn, seq uint64, payload []byte) (err error)
 	return nil
 }
 
-func RecvOne(sindex int, conn *net.UDPConn) error {
+func RecvOne(wg *sync.WaitGroup, sindex int, conn *net.UDPConn) error {
+	defer wg.Done()
+
 	buf := make([]byte, MaxPktLen+128)
 	conn.SetReadDeadline(time.Now().Add(time.Duration(Timeout) * time.Millisecond))
 	n, addr, err := conn.ReadFromUDP(buf)
@@ -214,6 +217,7 @@ func SendAndRecvPerServer(wg *sync.WaitGroup, caddr net.IP, sindex int) {
 	var payload = make([]byte, PayloadLen-12)
 	rand.Read(payload[:])
 
+	wg1 := sync.WaitGroup{}
 	for seq < Count {
 		if Interrupted {
 			break	
@@ -239,17 +243,23 @@ func SendAndRecvPerServer(wg *sync.WaitGroup, caddr net.IP, sindex int) {
 				fmt.Printf("dial error: %s\n", err)
 				return
 			}
-			go SendOne(sindex, c, seq, payload)
-			go RecvOne(sindex, c)
 			defer c.Close()
+
+			wg1.Add(1)
+			go SendOne(&wg1, sindex, c, seq, payload)
+			wg1.Add(1)
+			go RecvOne(&wg1, sindex, c)
 		} else {
-			go SendOne(sindex, c, seq, payload)
-			go RecvOne(sindex, c)
+			wg1.Add(1)
+			go SendOne(&wg1, sindex, c, seq, payload)
+			wg1.Add(1)
+			go RecvOne(&wg1, sindex, c)
 		}
 
 		time.Sleep(time.Duration(Interval) * time.Millisecond)
 		seq++
 	}
+	wg1.Wait()
 }
 
 

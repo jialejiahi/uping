@@ -75,21 +75,7 @@ examples：
 ./uping -B 10.0.32.172 -P 13579 -c 1000 -m -l 2560 -t 100 -i 1
 ```
 示例输出
-```
-...
-2560 bytes from 10.0.32.172:13579(server2): seq=985 time=247.408µs2560 bytes from 10.0.32.172:13579(server1): seq=986 time=253.425µs
-2560 bytes from 10.0.32.172:13579(server1): seq=987 time=256.189µs2560 bytes from 10.0.32.172:13579(server1): seq=988 time=268.701µs
-2560 bytes from 10.0.32.172:13579(server2): seq=989 time=237.982µs2560 bytes from 10.0.32.172:13579(server2): seq=990 time=239.375µs
-2560 bytes from 10.0.32.172:13579(server1): seq=991 time=238.659µs2560 bytes from 10.0.32.172:13579(server1): seq=992 time=249.796µs
-2560 bytes from 10.0.32.172:13579(server2): seq=993 time=244.983µs2560 bytes from 10.0.32.172:13579(server1): seq=994 time=259.84µs
-2560 bytes from 10.0.32.172:13579(server2): seq=995 time=235.944µs2560 bytes from 10.0.32.172:13579(server1): seq=996 time=241.057µs
-2560 bytes from 10.0.32.172:13579(server2): seq=997 time=242.781µs2560 bytes from 10.0.32.172:13579(server2): seq=998 time=247.148µs
-2560 bytes from 10.0.32.172:13579(server2): seq=999 time=270.459µs
---- 10.0.32.172:13579 uping statistics ---1000 packets transmitted, 1000 received, 0 packet loss
-successful requests rtt avg/max = 293.519µs/23.718467ms
-lb statistics for each rs name:
-server1: 498 received, rtt avg/max = 283.795µs/1.792277ms
-server2: 502 received, rtt avg/max = 303.167µs/23.718467ms
+```bash
 
 ```
 # 统计信息
