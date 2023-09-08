@@ -132,11 +132,11 @@ func get_all_stats() {
 
 	for _, s := range serverStatSlice {
 		if len(s.StatPerNames) > 1 {
-			fmt.Printf("\n---%s:%d uping statistics ---\n", s.Saddr, s.Sport)
+			fmt.Printf("\n--- %s:%d uping statistics ---\n", s.Saddr, s.Sport)
 		} else if len(s.StatPerNames) == 1 {
 			fmt.Printf("\n--- %s:%d(%s) uping statistics ---\n", s.Saddr, s.Sport, s.StatPerNames[0].Name)
 		} else {
-			fmt.Printf("\n---%s:%d uping statistics ---\n", s.Saddr, s.Sport)
+			fmt.Printf("\n--- %s:%d uping statistics ---\n", s.Saddr, s.Sport)
 			fmt.Printf("0 received, 100%% packet loss\n")
 			continue
 		}

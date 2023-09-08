@@ -66,11 +66,11 @@ examples：
 ./uping -B 127.0.0.1
 
 # server端监听两个端口，并设置名称为server1
-./uping -s -B 10.0.32.12 -P 23456,23457 -name server1
-./uping -s -B 10.0.32.133 -P 23456,23457 -name server2
+./uping -s -B 10.0.32.12 -P 22222,33333 -name server1
+./uping -s -B 10.0.32.133 -P 22222,33333 -name server2
 
 # 访问lb监听器的地址和端口，指定报文长度为256， 发送间隔1毫秒
-./uping -B 10.0.32.99 -P 12345 -l 256 -i 1 -c 100 -t 100
+./uping -B 10.0.32.99 -P 12345 -l 256 -i 1 -c 100 -t 100 -m
 ```
 
 # 统计信息
