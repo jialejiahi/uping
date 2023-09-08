@@ -137,7 +137,7 @@ func main() {
 	//go func() {
 	//	log.Println(http.ListenAndServe("localhost:6060", nil))
 	//}()
-	if len(os.Args) < 1 {
+	if len(os.Args) < 2 {
 		Usage()
 		return
 	}
@@ -151,7 +151,6 @@ func main() {
 	//Dbglvl 2: 打印每个数据线程的调试信息, per server port
 	//Dbglvl 3: 打印所有连接和请求的调试信息, per client port
 	if Dbglvl > 2 || Dbglvl < 0 {
-		fmt.Printf("debug level %d illegal, set to 3!\n", Dbglvl)
 		Dbglvl = 2
 	}
 	plist, err := GetPortList(SPortList)
@@ -163,7 +162,7 @@ func main() {
 	if !IsServer {
 		saddr := net.ParseIP(SAddr)
 		if saddr == nil || saddr.Equal(net.ParseIP("0.0.0.0")) {
-			fmt.Printf("Legal Server IP saddress %s must be set with -B when the program run as client!\n", SAddr)
+			fmt.Printf("Legal Server IP address must be set with -B when the program run as client!\n")
 			return
 		}
 		caddr := net.ParseIP(CAddr)
