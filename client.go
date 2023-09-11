@@ -78,19 +78,22 @@ func SendOne(sindex int, c *net.UDPConn, seq uint64, payload []byte) (err error)
 	return nil
 }
 
-func RecvOne(wg *sync.WaitGroup, sindex int, conn *net.UDPConn) error {
+func RecvOne(wg *sync.WaitGroup, sindex int, conn *net.UDPConn, seq uint64) error {
 	defer wg.Done()
 
 	buf := make([]byte, MaxPktLen+128)
 	conn.SetReadDeadline(time.Now().Add(time.Duration(Timeout) * time.Millisecond))
 	n, addr, err := conn.ReadFromUDP(buf)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Printf("seq %d: %s\n", ID, err.Error())
 		return err
 	}
 	if n <= 0 {
 		fmt.Printf("received zero bytes from %s\n", addr)
 		return fmt.Errorf("received zero bytes from %s", addr)
+	}
+	if MutSport && conn != nil {
+		conn.Close()
 	}
 	resp := RespHeader{
 		Id:	  binary.BigEndian.Uint32(buf[0:4]),
@@ -280,7 +283,7 @@ func SendAndRecvPerServer(wg *sync.WaitGroup, caddr net.IP, sindex int) {
 
 			SendOne(sindex, c, seq, payload)
 			wg1.Add(1)
-			go RecvOne(&wg1, sindex, c)
+			go RecvOne(&wg1, sindex, c, seq)
 			seq++
 		}
 		send_and_recv()
