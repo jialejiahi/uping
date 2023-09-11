@@ -73,27 +73,67 @@ examples：
 ./uping -s -B 10.0.32.178 -P 22222,33333 -n server2
 
 # client访问lb监听器的地址和端口，指定报文长度为256， 发送间隔1毫秒
-./uping -B 10.0.32.172 -P 13579 -c 1000 -m -l 2560 -t 100 -i 1
+./uping -B 10.0.32.172 -P 13579 -c 5000 -l 256 -t 1000 -i 1 -m
+./uping -B 10.0.32.172 -P 13579 -c 60000 -l 256 -t 1000 -i 1 -m -d 0
+
 ```
 示例输出
 ```bash
-2560 bytes from 10.0.32.172:13579(server1): seq=991 time=245.23µs
-2560 bytes from 10.0.32.172:13579(server1): seq=992 time=237.1µs
-2560 bytes from 10.0.32.172:13579(server1): seq=993 time=246.592µs
-2560 bytes from 10.0.32.172:13579(server2): seq=994 time=290.818µs
-2560 bytes from 10.0.32.172:13579(server1): seq=995 time=231.009µs
-2560 bytes from 10.0.32.172:13579(server1): seq=996 time=252.372µs
-2560 bytes from 10.0.32.172:13579(server1): seq=997 time=234.761µs
-2560 bytes from 10.0.32.172:13579(server2): seq=998 time=252.566µs
-2560 bytes from 10.0.32.172:13579(server2): seq=999 time=254.894µs
+256 bytes from 10.0.32.172:13579(server2): seq=4984 time=155.076µs
+256 bytes from 10.0.32.172:13579(server2): seq=4985 time=149.373µs
+256 bytes from 10.0.32.172:13579(server1): seq=4986 time=149.172µs
+256 bytes from 10.0.32.172:13579(server2): seq=4987 time=188.161µs
+256 bytes from 10.0.32.172:13579(server1): seq=4988 time=147.042µs
+256 bytes from 10.0.32.172:13579(server2): seq=4989 time=162.258µs
+256 bytes from 10.0.32.172:13579(server1): seq=4990 time=134.791µs
+256 bytes from 10.0.32.172:13579(server2): seq=4991 time=193.082µs
+256 bytes from 10.0.32.172:13579(server2): seq=4992 time=140.535µs
+256 bytes from 10.0.32.172:13579(server2): seq=4993 time=158.263µs
+256 bytes from 10.0.32.172:13579(server1): seq=4994 time=209.905µs
+256 bytes from 10.0.32.172:13579(server2): seq=4995 time=142.841µs
+256 bytes from 10.0.32.172:13579(server2): seq=4996 time=155.149µs
+256 bytes from 10.0.32.172:13579(server2): seq=4997 time=139.575µs
+256 bytes from 10.0.32.172:13579(server2): seq=4998 time=146.312µs
+256 bytes from 10.0.32.172:13579(server1): seq=4999 time=161.93µs
 
 --- 10.0.32.172:13579 uping statistics ---
-1000 packets transmitted, 1000 received, 0 packet loss
-successful requests rtt avg/max = 276.687µs/5.258831ms
+5000 packets transmitted, 5000 received, 0 packet loss
+successful requests rtt avg/max = 199.757µs/8.804277ms, max rtt seq is 3435
 lb statistics for each rs name:
-server1: 499 received, rtt avg/max = 294.33µs/5.258831ms
-server2: 501 received, rtt avg/max = 259.114µs/920.341µs
+server2: 2448 received, rtt avg/max = 202.771µs/8.804277ms, max rtt seq is 3435
+server1: 2552 received, rtt avg/max = 199.316µs/6.801022ms, max rtt seq is 3437
 ```
+示例输出，发包端转发组件重启
+```bash
+read udp 10.0.32.12:56469->10.0.32.172:13579: i/o timeout
+read udp 10.0.32.12:59043->10.0.32.172:13579: i/o timeout
+read udp 10.0.32.12:33787->10.0.32.172:13579: i/o timeout
+read udp 10.0.32.12:38807->10.0.32.172:13579: i/o timeout
+read udp 10.0.32.12:56996->10.0.32.172:13579: i/o timeout
+read udp 10.0.32.12:35076->10.0.32.172:13579: i/o timeout
+read udp 10.0.32.12:52660->10.0.32.172:13579: i/o timeout
+read udp 10.0.32.12:40473->10.0.32.172:13579: i/o timeout
+read udp 10.0.32.12:46737->10.0.32.172:13579: i/o timeout
+read udp 10.0.32.12:55967->10.0.32.172:13579: i/o timeout
+read udp 10.0.32.12:35684->10.0.32.172:13579: i/o timeout
+read udp 10.0.32.12:38670->10.0.32.172:13579: i/o timeout
+read udp 10.0.32.12:43568->10.0.32.172:13579: i/o timeout
+read udp 10.0.32.12:40471->10.0.32.172:13579: i/o timeout
+read udp 10.0.32.12:60392->10.0.32.172:13579: i/o timeout
+read udp 10.0.32.12:52925->10.0.32.172:13579: i/o timeout
+read udp 10.0.32.12:40567->10.0.32.172:13579: i/o timeout
+read udp 10.0.32.12:33858->10.0.32.172:13579: i/o timeout
+read udp 10.0.32.12:46624->10.0.32.172:13579: i/o timeout
+^C
+--- 10.0.32.172:13579 uping statistics ---
+32984 packets transmitted, 32965 received, 19 packet loss
+successful requests rtt avg/max = 183.77µs/11.393629ms, max rtt seq is 12430
+estimate network failure time: 19ms
+lb statistics for each rs name:
+server2: 16404 received, rtt avg/max = 186.256µs/9.765308ms, max rtt seq is 12431
+server1: 16561 received, rtt avg/max = 198.136µs/11.393629ms, max rtt seq is 12430
+```
+
 # 统计信息
 
 1. 服务端打印收到了客户端的包

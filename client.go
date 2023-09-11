@@ -207,23 +207,30 @@ func get_all_stats() {
 	}
 }
 
+func DelayMicroseconds(us int64) {
+	var tv syscall.Timeval
+	_ = syscall.Gettimeofday(&tv)
+
+	stratTick := int64(tv.Sec)*int64(1000000) + int64(tv.Usec) + us
+	endTick := int64(0)
+	for endTick < stratTick {
+		_ = syscall.Gettimeofday(&tv)
+		endTick = int64(tv.Sec)*int64(1000000) + int64(tv.Usec)
+	}
+}
+
 func SendAndRecvPerServer(wg *sync.WaitGroup, caddr net.IP, sindex int) {
 	defer wg.Done()
 
 	var seq uint64 = 0
-	var err error = nil
 	var c *net.UDPConn = nil
+	raddr := &net.UDPAddr{IP: serverStatSlice[sindex].Saddr, Port: serverStatSlice[sindex].Sport}
 	if !MutSport {
 		d := net.Dialer{
 			Control: Control,
 			LocalAddr: &net.UDPAddr{IP: caddr, Port: CPort},
 		}
-		raddr := &net.UDPAddr{IP: serverStatSlice[sindex].Saddr, Port: serverStatSlice[sindex].Sport}
 		cc, err := d.Dial("udp", raddr.String())
-		//c, err = net.DialUDP("udp", &net.UDPAddr{IP: caddr, Port: CPort},
-		//	  &net.UDPAddr{IP: serverStatSlice[sindex].Saddr, Port: serverStatSlice[sindex].Sport})
-		//c, err = net.DialUDP("udp", &net.UDPAddr{IP: caddr, Port: CPort},
-		//	  &net.UDPAddr{IP: serverStatSlice[sindex].Saddr, Port: serverStatSlice[sindex].Sport})	
 		if err != nil {
 			fmt.Printf("dial error: %s\n", err)
 			return
@@ -244,15 +251,21 @@ func SendAndRecvPerServer(wg *sync.WaitGroup, caddr net.IP, sindex int) {
 		}
 
 		if MutSport {
-			c, err = net.DialUDP("udp", &net.UDPAddr{IP: caddr },
-				  &net.UDPAddr{IP: serverStatSlice[sindex].Saddr, Port: serverStatSlice[sindex].Sport})	
+			// c, err = net.DialUDP("udp", &net.UDPAddr{IP: caddr },
+				//   &net.UDPAddr{IP: serverStatSlice[sindex].Saddr, Port: serverStatSlice[sindex].Sport})	
+					
+			d := net.Dialer{
+				Control: Control,
+				LocalAddr: &net.UDPAddr{IP: caddr},
+			}
+			cc, err := d.Dial("udp", raddr.String())
 			if err != nil {
 				fmt.Printf("dial error: %s\n", err)
 				return
 			}
-
+			c = cc.(*net.UDPConn)
+			defer c.Close()
 		}
-		defer c.Close()
 		send_and_recv := func () {
 			if seq != uint64(len(serverStatSlice[sindex].ReqStats)) {
 				fmt.Printf("seq %d not equal len(ReqStats) %d\n", seq, len(serverStatSlice[sindex].ReqStats))
@@ -270,15 +283,15 @@ func SendAndRecvPerServer(wg *sync.WaitGroup, caddr net.IP, sindex int) {
 			go RecvOne(&wg1, sindex, c)
 			seq++
 		}
+		send_and_recv()
 		if Interval >= 10 {
-			send_and_recv()
 			time.Sleep(time.Duration(Interval) * time.Millisecond)
+		} else if Interval > 2 {
+			//use busy wait
+			DelayMicroseconds(int64(Interval) * 1000)
 		} else {
-			//burst 10 packets
-			for i := 0; i < 10; i++ {
-				send_and_recv()
-			}
-			time.Sleep(time.Duration(Interval) * time.Millisecond * 10)
+			// if Interval <= 2, delay less 30us for better accuracy
+			DelayMicroseconds(int64(Interval) * 1000 - 30)
 		}
 
 	}

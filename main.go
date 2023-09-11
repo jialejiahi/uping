@@ -41,8 +41,9 @@ func init() {
 	flag.StringVar(&CAddr, "b", "0.0.0.0", "Client Binding Address, Client Only")
 	flag.IntVar(&CPort, "p", 0, "Client Binding Port, Client Only")
 	flag.BoolVar(&MutSport, "m", false, "Mutable Source Port, Client Only")
+	//flag.BoolVar(&USInterval, "u", false, "Mutable Source Port, Client Only")
 	flag.IntVar(&PayloadLen, "l", 64, "Payload Length, Client Only")
-	flag.IntVar(&Interval, "i", 100, "New Request Interval, Client Only")
+	flag.IntVar(&Interval, "i", 100, "New Request Interval in ms, Client Only")
 	flag.Uint64Var(&Count, "c", 10, "Requests per data socket, Client Only")
 	flag.IntVar(&Timeout, "t", 1000, "Receive Response Timeout in ms, Client Only")
 }
