@@ -1,4 +1,4 @@
-module tcperf
+module uping
 
 go 1.16
 
