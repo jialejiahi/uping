@@ -25,6 +25,7 @@ var (
 	Interval   int //default 100, 单位ms
 	Count      uint64 //发送报文的数量
 	Timeout    int //认为报文无应答的超时时间
+	Tcp 	   bool //use tcp, default false
 )
 
 var Interrupted bool
@@ -34,6 +35,7 @@ func init() {
 	flag.IntVar(&Dbglvl, "d", 1, "Debug level 0-3")
 	flag.StringVar(&SAddr, "B", "0.0.0.0", "Server Binding Address, Must be set if run as Client")
 	flag.StringVar(&SPortList, "P", "23456,23457", "Server Data Port List")
+	flag.BoolVar(&Tcp, "T", false, "Use TCP Protocol, default false")
 
 	flag.BoolVar(&IsServer, "s", false, "Run as server, Server Only")
 	flag.StringVar(&Name, "n", "", "Server Host Name, Get Host Name if it's not given, Server Only")
@@ -67,6 +69,9 @@ func Usage() {
   -P string
         Server Data Port List, format: 23456,23457
         服务端监听的端口列表,客户端指定多个端口时,将循环遍历端口列表
+  -T bool
+        Use tcp instead of udp for ping (default false)
+        使用tcp协议而不是udp, 默认false
   -s bool
         Run as server (default false)
         作为server运行,不指定则作为client运行

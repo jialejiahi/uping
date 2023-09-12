@@ -11,29 +11,12 @@ import (
 	"sync"
 	"syscall"
 	"time"
-
-	"golang.org/x/sys/unix"
 )
 
 var ID uint32 = 0
 var serverStatSlice = []StatPerServer{}
 var serverStatSliceLock sync.Mutex
 
-func Control(network, address string, c syscall.RawConn) error {
-	var err error
-	c.Control(func(fd uintptr) {
-		err = unix.SetsockoptInt(int(fd), unix.SOL_SOCKET, unix.SO_REUSEADDR, 1)
-		if err != nil {
-			return
-		}
-
-		err = unix.SetsockoptInt(int(fd), unix.SOL_SOCKET, unix.SO_REUSEPORT, 1)
-		if err != nil {
-			return
-		}
-	})
-	return err
-}
 // use a slice, struct in map can not be changed
 func get_stat_for_name(server_index int, name string) int {
 	serverStatSliceLock.Lock()
@@ -52,7 +35,7 @@ func get_stat_for_name(server_index int, name string) int {
 }
 
 //construct and send one packet
-func SendOne(sindex int, c *net.UDPConn, seq uint64, payload []byte) (err error) {
+func SendOne(sindex int, c net.Conn, seq uint64, payload []byte) (err error) {
 	var buf bytes.Buffer
 	req := ReqHeader {
 		Id: ID,
@@ -78,12 +61,14 @@ func SendOne(sindex int, c *net.UDPConn, seq uint64, payload []byte) (err error)
 	return nil
 }
 
-func RecvOne(wg *sync.WaitGroup, sindex int, conn *net.UDPConn, seq uint64) error {
+func RecvOne(wg *sync.WaitGroup, sindex int, conn net.Conn, seq uint64) error {
 	defer wg.Done()
 
 	buf := make([]byte, MaxPktLen+128)
 	conn.SetReadDeadline(time.Now().Add(time.Duration(Timeout) * time.Millisecond))
-	n, addr, err := conn.ReadFromUDP(buf)
+	n, err := conn.Read(buf)
+	addr := conn.RemoteAddr()
+
 	if err != nil {
 		fmt.Printf("seq %d: %s\n", ID, err.Error())
 		return err
@@ -136,11 +121,11 @@ func get_all_stats() {
 
 	for _, s := range serverStatSlice {
 		if len(s.StatPerNames) > 1 {
-			fmt.Printf("\n--- %s:%d uping statistics ---\n", s.Saddr, s.Sport)
+			fmt.Printf("\n--- %s:%d utping statistics ---\n", s.Saddr, s.Sport)
 		} else if len(s.StatPerNames) == 1 {
-			fmt.Printf("\n--- %s:%d(%s) uping statistics ---\n", s.Saddr, s.Sport, s.StatPerNames[0].Name)
+			fmt.Printf("\n--- %s:%d(%s) utping statistics ---\n", s.Saddr, s.Sport, s.StatPerNames[0].Name)
 		} else {
-			fmt.Printf("\n--- %s:%d uping statistics ---\n", s.Saddr, s.Sport)
+			fmt.Printf("\n--- %s:%d utping statistics ---\n", s.Saddr, s.Sport)
 			fmt.Printf("0 received, 100%% packet loss\n")
 			continue
 		}
@@ -226,19 +211,26 @@ func SendAndRecvPerServer(wg *sync.WaitGroup, caddr net.IP, sindex int) {
 	defer wg.Done()
 
 	var seq uint64 = 0
-	var c *net.UDPConn = nil
-	raddr := &net.UDPAddr{IP: serverStatSlice[sindex].Saddr, Port: serverStatSlice[sindex].Sport}
+	var c net.Conn = nil
+	var err error
 	if !MutSport {
-		d := net.Dialer{
-			Control: Control,
-			LocalAddr: &net.UDPAddr{IP: caddr, Port: CPort},
+		if !Tcp {
+			raddr := &net.UDPAddr{IP: serverStatSlice[sindex].Saddr, Port: serverStatSlice[sindex].Sport}
+			laddr := &net.UDPAddr{IP: caddr, Port: CPort}
+			c, err = Dial("udp", laddr.String(), raddr.String())
+			if err != nil {
+				fmt.Printf("dial error: %s\n", err)
+				return
+			}
+		} else {
+			raddr := &net.TCPAddr{IP: serverStatSlice[sindex].Saddr, Port: serverStatSlice[sindex].Sport}
+			laddr := &net.TCPAddr{IP: caddr, Port: CPort}
+			c, err = Dial("tcp", laddr.String(), raddr.String())
+			if err != nil {
+				fmt.Printf("dial error: %s\n", err)
+				return
+			}
 		}
-		cc, err := d.Dial("udp", raddr.String())
-		if err != nil {
-			fmt.Printf("dial error: %s\n", err)
-			return
-		}
-		c = cc.(*net.UDPConn)
 		defer c.Close()
 	}
 	var payload = make([]byte, PayloadLen-12)
@@ -256,17 +248,23 @@ func SendAndRecvPerServer(wg *sync.WaitGroup, caddr net.IP, sindex int) {
 		if MutSport {
 			// c, err = net.DialUDP("udp", &net.UDPAddr{IP: caddr },
 				//   &net.UDPAddr{IP: serverStatSlice[sindex].Saddr, Port: serverStatSlice[sindex].Sport})	
-					
-			d := net.Dialer{
-				Control: Control,
-				LocalAddr: &net.UDPAddr{IP: caddr},
+	   		if !Tcp {
+				raddr := &net.UDPAddr{IP: serverStatSlice[sindex].Saddr, Port: serverStatSlice[sindex].Sport}
+				laddr := &net.UDPAddr{IP: caddr}
+				c, err = Dial("udp", laddr.String(), raddr.String())
+				if err != nil {
+					fmt.Printf("dial error: %s\n", err)
+					return
+				}
+			} else {
+				raddr := &net.TCPAddr{IP: serverStatSlice[sindex].Saddr, Port: serverStatSlice[sindex].Sport}
+				laddr := &net.TCPAddr{IP: caddr}
+				c, err = Dial("tcp", laddr.String(), raddr.String())
+				if err != nil {
+					fmt.Printf("dial error: %s\n", err)
+					return
+				}
 			}
-			cc, err := d.Dial("udp", raddr.String())
-			if err != nil {
-				fmt.Printf("dial error: %s\n", err)
-				return
-			}
-			c = cc.(*net.UDPConn)
 			defer c.Close()
 		}
 		send_and_recv := func () {
@@ -321,6 +319,11 @@ func client_main(saddr net.IP, caddr net.IP, plist []uint16) {
 			PayloadLen, Interval, Count, Timeout)
 	}
 	ID = rand.Uint32()	
+	if MutSport {
+		ID = ID | 0x00000001 	
+	} else {
+		ID = ID & 0xfffffffe
+	}
 	//handle
 	Interrupted = false
 	c := make(chan os.Signal, 1)
