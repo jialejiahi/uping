@@ -1,4 +1,4 @@
-module utping
+module uping
 
 go 1.16
 

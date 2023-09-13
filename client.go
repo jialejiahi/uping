@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"math/rand"
 	"net"
@@ -37,6 +38,7 @@ func get_stat_for_name(server_index int, name string) int {
 //construct and send one packet
 func SendOne(sindex int, c net.Conn, seq uint64, payload []byte) (err error) {
 	var buf bytes.Buffer
+	c.SetWriteDeadline(time.Now().Add(time.Duration(Timeout) * time.Millisecond))
 	req := ReqHeader {
 		Id: ID,
 		Seq: seq,
@@ -61,21 +63,37 @@ func SendOne(sindex int, c net.Conn, seq uint64, payload []byte) (err error) {
 	return nil
 }
 
-func RecvOne(wg *sync.WaitGroup, sindex int, conn net.Conn, seq uint64) error {
+func RecvOne(wg *sync.WaitGroup, sindex int, conn net.Conn, seq uint64) (err error) {
 	defer wg.Done()
-
 	buf := make([]byte, MaxPktLen+128)
-	conn.SetReadDeadline(time.Now().Add(time.Duration(Timeout) * time.Millisecond))
-	n, err := conn.Read(buf)
-	addr := conn.RemoteAddr()
+
+	var n int
+	var raddr net.Addr
+	var uconn *net.UDPConn
+	var tconn *net.TCPConn
+
+	if Tcp {
+		tconn = conn.(*net.TCPConn)
+		tconn.SetReadDeadline(time.Now().Add(time.Duration(Timeout) * time.Millisecond))
+	} else {
+		uconn = conn.(*net.UDPConn)
+		uconn.SetReadDeadline(time.Now().Add(time.Duration(Timeout) * time.Millisecond))
+	}
+
+	if Tcp {
+		n, err = tconn.Read(buf)
+		raddr = tconn.RemoteAddr()
+	} else {
+		n, raddr, err = uconn.ReadFromUDP(buf)
+	}
 
 	if err != nil {
 		fmt.Printf("seq %d: %s\n", ID, err.Error())
 		return err
 	}
 	if n <= 0 {
-		fmt.Printf("received zero bytes from %s\n", addr)
-		return fmt.Errorf("received zero bytes from %s", addr)
+		fmt.Printf("received zero bytes from %s\n", raddr)
+		return fmt.Errorf("received zero bytes from %s", raddr)
 	}
 	if MutSport && conn != nil {
 		conn.Close()
@@ -109,7 +127,7 @@ func RecvOne(wg *sync.WaitGroup, sindex int, conn net.Conn, seq uint64) error {
 
 	if Dbglvl > 0 {
 		fmt.Printf("%d bytes from %s(%s): seq=%d time=%s\n",
-			n, addr.String(), name, resp.Seq, rtt.String())
+			n, raddr.String(), name, resp.Seq, rtt.String())
 	}
 
 	return nil
@@ -121,11 +139,11 @@ func get_all_stats() {
 
 	for _, s := range serverStatSlice {
 		if len(s.StatPerNames) > 1 {
-			fmt.Printf("\n--- %s:%d utping statistics ---\n", s.Saddr, s.Sport)
+			fmt.Printf("\n--- %s:%d uping statistics ---\n", s.Saddr, s.Sport)
 		} else if len(s.StatPerNames) == 1 {
-			fmt.Printf("\n--- %s:%d(%s) utping statistics ---\n", s.Saddr, s.Sport, s.StatPerNames[0].Name)
+			fmt.Printf("\n--- %s:%d(%s) uping statistics ---\n", s.Saddr, s.Sport, s.StatPerNames[0].Name)
 		} else {
-			fmt.Printf("\n--- %s:%d utping statistics ---\n", s.Saddr, s.Sport)
+			fmt.Printf("\n--- %s:%d uping statistics ---\n", s.Saddr, s.Sport)
 			fmt.Printf("0 received, 100%% packet loss\n")
 			continue
 		}
@@ -207,6 +225,18 @@ func DelayMicroseconds(us int64) {
 	}
 }
 
+func delay() {
+	if Interval >= 10 {
+		time.Sleep(time.Duration(Interval) * time.Millisecond)
+	} else if Interval > 2 {
+		//use busy wait
+		DelayMicroseconds(int64(Interval) * 1000)
+	} else {
+		// if Interval <= 2, delay less 30us for better accuracy
+		DelayMicroseconds(int64(Interval) * 1000 - 30)
+	}
+}
+
 func SendAndRecvPerServer(wg *sync.WaitGroup, caddr net.IP, sindex int) {
 	defer wg.Done()
 
@@ -230,13 +260,13 @@ func SendAndRecvPerServer(wg *sync.WaitGroup, caddr net.IP, sindex int) {
 				fmt.Printf("dial error: %s\n", err)
 				return
 			}
+			SetTcpConnOptions(c.(*net.TCPConn))
 		}
-		defer c.Close()
 	}
 	var payload = make([]byte, PayloadLen-12)
 	rand.Read(payload[:])
 
-	wg1 := sync.WaitGroup{}
+	var wg1 sync.WaitGroup
 	for seq < Count {
 		if Interrupted {
 			break	
@@ -244,6 +274,17 @@ func SendAndRecvPerServer(wg *sync.WaitGroup, caddr net.IP, sindex int) {
 		if seq >= Count {
 			break
 		}
+
+		if seq != uint64(len(serverStatSlice[sindex].ReqStats)) {
+			fmt.Printf("seq %d not equal len(ReqStats) %d\n", seq, len(serverStatSlice[sindex].ReqStats))
+			return
+		}
+		serverStatSlice[sindex].ReqLock.Lock()
+		serverStatSlice[sindex].ReqStats = append(serverStatSlice[sindex].ReqStats, ReqStat{
+			Seq: seq,
+			RespStatPtr: nil,
+		})
+		serverStatSlice[sindex].ReqLock.Unlock()
 
 		if MutSport {
 			// c, err = net.DialUDP("udp", &net.UDPAddr{IP: caddr },
@@ -253,48 +294,44 @@ func SendAndRecvPerServer(wg *sync.WaitGroup, caddr net.IP, sindex int) {
 				laddr := &net.UDPAddr{IP: caddr}
 				c, err = Dial("udp", laddr.String(), raddr.String())
 				if err != nil {
-					fmt.Printf("dial error: %s\n", err)
-					return
+					fmt.Printf("seq = %d, dial error: %s\n", seq, err)
+					seq++
+					delay()
+					continue
 				}
 			} else {
 				raddr := &net.TCPAddr{IP: serverStatSlice[sindex].Saddr, Port: serverStatSlice[sindex].Sport}
 				laddr := &net.TCPAddr{IP: caddr}
 				c, err = Dial("tcp", laddr.String(), raddr.String())
 				if err != nil {
-					fmt.Printf("dial error: %s\n", err)
-					return
+					fmt.Printf("seq = %d, dial error: %s\n", seq, err)
+					seq++
+					delay()
+					continue
 				}
+				SetTcpConnOptions(c.(*net.TCPConn))
 			}
 			defer c.Close()
 		}
-		send_and_recv := func () {
-			if seq != uint64(len(serverStatSlice[sindex].ReqStats)) {
-				fmt.Printf("seq %d not equal len(ReqStats) %d\n", seq, len(serverStatSlice[sindex].ReqStats))
-				return
+
+		//send_and_recv()
+		err = SendOne(sindex, c, seq, payload)
+		if Tcp {
+			if errors.Is(err, syscall.EPIPE) || errors.Is(err, syscall.ECONNRESET) {
+				if MutSport {
+					seq++
+					delay()
+					continue
+				} else {
+					fmt.Printf("seq = %d, the only tcp connection we are using is disconnected\n", seq)
+					break
+				}
 			}
-			serverStatSlice[sindex].ReqLock.Lock()
-			serverStatSlice[sindex].ReqStats = append(serverStatSlice[sindex].ReqStats, ReqStat{
-				Seq: seq,
-				RespStatPtr: nil,
-			})
-			serverStatSlice[sindex].ReqLock.Unlock()
-
-			SendOne(sindex, c, seq, payload)
-			wg1.Add(1)
-			go RecvOne(&wg1, sindex, c, seq)
-			seq++
 		}
-		send_and_recv()
-		if Interval >= 10 {
-			time.Sleep(time.Duration(Interval) * time.Millisecond)
-		} else if Interval > 2 {
-			//use busy wait
-			DelayMicroseconds(int64(Interval) * 1000)
-		} else {
-			// if Interval <= 2, delay less 30us for better accuracy
-			DelayMicroseconds(int64(Interval) * 1000 - 30)
-		}
-
+		wg1.Add(1)
+		go RecvOne(&wg1, sindex, c, seq)
+		seq++
+		delay()
 	}
 	wg1.Wait()
 }

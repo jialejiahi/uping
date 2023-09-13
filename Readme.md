@@ -8,7 +8,7 @@ ping 是测试连通性和时延的工具,简单易用, 但有时候我们需要
 
 但上面的工具都没考虑负载均衡多个rs的场景,用起来也没ping那么简单直观。
 
-因此开发一个测试工具 utping, 基本功能是测试 udp 连通性,并能够像系统自带的 ping 一样统计 rtt 时延。
+因此开发一个测试工具 uping, 基本功能是测试 udp 连通性,并能够像系统自带的 ping 一样统计 rtt 时延。
 
 同时满足如下需求:
 
@@ -67,18 +67,18 @@ examples：
 
 ```bash
 # 1. 类似ping的简单使用方式, 客户端访问服务端的23456, 23457 接口
-./utping -s &
-./utping -B 127.0.0.1
+./uping -s &
+./uping -B 127.0.0.1
 
 # 配置lb监听器,ip地址10.0.32.172,端口13579
 # 后端绑定两个rs, 10.0.32.75 10.0.32.178
 # lb的两个rs server端分别监听两个端口
-./utping -s -B 10.0.32.75 -P 22222,33333 -n server1
-./utping -s -B 10.0.32.178 -P 22222,33333 -n server2
+./uping -s -B 10.0.32.75 -P 22222,33333 -n server1
+./uping -s -B 10.0.32.178 -P 22222,33333 -n server2
 
 # client访问lb监听器的地址和端口,指定报文长度为256, 发送间隔1毫秒
-./utping -B 10.0.32.172 -P 13579 -c 5000 -l 256 -t 1000 -i 1 -m
-./utping -B 10.0.32.172 -P 13579 -c 60000 -l 256 -t 1000 -i 1 -m -d 0
+./uping -B 10.0.32.172 -P 13579 -c 5000 -l 256 -t 1000 -i 1 -m
+./uping -B 10.0.32.172 -P 13579 -c 60000 -l 256 -t 1000 -i 1 -m -d 0
 
 ```
 示例输出
@@ -100,7 +100,7 @@ examples：
 256 bytes from 10.0.32.172:13579(server2): seq=4998 time=146.312µs
 256 bytes from 10.0.32.172:13579(server1): seq=4999 time=161.93µs
 
---- 10.0.32.172:13579 utping statistics ---
+--- 10.0.32.172:13579 uping statistics ---
 5000 packets transmitted, 5000 received, 0 packet loss
 successful requests rtt avg/max = 199.757µs/8.804277ms, max rtt seq is 3435
 lb statistics for each rs name:
@@ -129,7 +129,7 @@ read udp 10.0.32.12:40567->10.0.32.172:13579: i/o timeout
 read udp 10.0.32.12:33858->10.0.32.172:13579: i/o timeout
 read udp 10.0.32.12:46624->10.0.32.172:13579: i/o timeout
 ^C
---- 10.0.32.172:13579 utping statistics ---
+--- 10.0.32.172:13579 uping statistics ---
 32984 packets transmitted, 32965 received, 19 packet loss
 successful requests rtt avg/max = 183.77µs/11.393629ms, max rtt seq is 12430
 estimate network failure time: 19ms

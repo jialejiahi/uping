@@ -16,7 +16,6 @@ import (
 func RecvAndSendOne(c net.Conn, buf []byte) (mutable bool, err error) {
 
 	var n int
-	//var raddr *net.UDPAddr
 	var raddr net.Addr
 
 	var uconn *net.UDPConn
@@ -29,7 +28,6 @@ func RecvAndSendOne(c net.Conn, buf []byte) (mutable bool, err error) {
 	}
 
 	if Tcp {
-		tconn.SetNoDelay(true)
 		n, err = tconn.Read(buf)
 		raddr = tconn.RemoteAddr()
 	} else {
@@ -105,6 +103,7 @@ func RecvAndSendOne(c net.Conn, buf []byte) (mutable bool, err error) {
 
 func HandleTcpLis(wg *sync.WaitGroup, lis *net.TCPListener) {
 	defer wg.Done()
+	var wg1 sync.WaitGroup
 	for !Interrupted {
 		conn, err := lis.AcceptTCP()
 		if err != nil {
@@ -114,6 +113,7 @@ func HandleTcpLis(wg *sync.WaitGroup, lis *net.TCPListener) {
 		if Dbglvl > 1 {
 			fmt.Printf("Accept a connection from %s\n", conn.RemoteAddr().String())
 		}
+		SetTcpConnOptions(conn)
 		buf := make([]byte, MaxPktLen+128)
 		mutsport, e := RecvAndSendOne(conn, buf)
 		if e != nil {
@@ -123,9 +123,11 @@ func HandleTcpLis(wg *sync.WaitGroup, lis *net.TCPListener) {
 		if mutsport {
 			conn.Close()	
 		} else {
-			go RecvAndSendAll(wg, conn)
+			wg1.Add(1)
+			go RecvAndSendAll(&wg1, conn)
 		}
 	}
+	wg1.Wait()
 }
 
 func RecvAndSendAll(wg *sync.WaitGroup, c net.Conn) {
@@ -136,7 +138,7 @@ func RecvAndSendAll(wg *sync.WaitGroup, c net.Conn) {
 	for !Interrupted {
 		_, err := RecvAndSendOne(c, buf)
 		if Tcp {
-			if errors.Is(err, syscall.EPIPE) || errors.Is(err, io.EOF)  {
+			if errors.Is(err, syscall.EPIPE) || errors.Is(err, io.EOF) || errors.Is(err, syscall.ECONNRESET) {
 				return
 			}
 		}
@@ -180,7 +182,6 @@ func server_main(saddr net.IP, plist []uint16) {
 				return
 			}
 			tlisteners = append(tlisteners, lis.(*net.TCPListener))
-			defer lis.Close()	
 		}
 	}
 	//handle

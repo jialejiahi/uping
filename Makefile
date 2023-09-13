@@ -4,20 +4,20 @@ DIR=$(shell pwd)
 
 all:
 	go mod tidy
-	go build -ldflags '-extldflags "-fno-PIC -static"' -o utping
-	GOOS=linux GOARCH=arm64 go build -ldflags '-extldflags "-fno-PIC -static"' -o utpingarm
+	go build -ldflags '-extldflags "-fno-PIC -static"' -o uping
+	GOOS=linux GOARCH=arm64 go build -ldflags '-extldflags "-fno-PIC -static"' -o upingarm
 
 # aarch64 compile
 arm:
-	GOOS=linux GOARCH=arm64 go build -ldflags '-extldflags "-fno-PIC -static"' -o utpingarm
+	GOOS=linux GOARCH=arm64 go build -ldflags '-extldflags "-fno-PIC -static"' -o upingarm
 
 install: all
-	tar -zcvf utping.tar.gz utping utpingarm
+	tar -zcvf uping.tar.gz uping upingarm
 	mkdir -p ${INSTALL_DIR}
-	cp -f ${DIR}/utping ${INSTALL_DIR}
-	cp -f ${DIR}/utping.tar.gz ${INSTALL_DIR}
+	cp -f ${DIR}/uping ${INSTALL_DIR}
+	cp -f ${DIR}/uping.tar.gz ${INSTALL_DIR}
 
 clean:
-	rm -f ${DIR}/utping
-	rm -f ${DIR}/utpingarm
-	rm -f ${DIR}/utping.tar.gz
+	rm -f ${DIR}/uping
+	rm -f ${DIR}/upingarm
+	rm -f ${DIR}/uping.tar.gz
