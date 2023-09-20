@@ -63,6 +63,7 @@ func SendOne(sindex int, c net.Conn, seq uint64, payload []byte) (err error) {
 	return nil
 }
 
+//TODO: handle tcp recv combined packet(two payload in one packet)
 func RecvOne(wg *sync.WaitGroup, sindex int, conn net.Conn, seq uint64) (err error) {
 	defer wg.Done()
 	buf := make([]byte, MaxPktLen+128)
@@ -180,7 +181,12 @@ func get_all_stats() {
 			fmt.Printf("successful requests rtt avg/max = %s/%s, max rtt seq is %d\n", s.AvgRtt, s.MaxRtt, maxRttSeq)
 		}
 		if s.LostNum > 0 {
-			fmt.Printf("estimate network failure time: %s\n", time.Duration(s.LostNum) * time.Duration(Interval) * time.Millisecond)
+			if Tcp && !MutSport {
+				//TODO: handle recv combined packet(two payload in one packet)
+				fmt.Printf("send/recv packets number may not match if tcp mutable sport(-m) is not set!\n")
+			} else {
+				fmt.Printf("estimate network failure time: %s\n", time.Duration(s.LostNum) * time.Duration(Interval) * time.Millisecond)
+			}
 		}
 		if len(s.StatPerNames) > 1 {
 			fmt.Printf("lb statistics for each rs name:\n")

@@ -89,7 +89,7 @@ func Usage() {
         客户端的端口随机变化, 默认false
   -l int
         Requests Length, Client Only (default 64)
-        请求报文的长度, 最小取值64字节, 以容纳包头
+        请求负载的长度, 最小取值64字节, 以容纳自定义负载头部
   -i int
         Request Sending Interval, Client Only (default 100)
         发包间隔,单位毫秒,默认值100
