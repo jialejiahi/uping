@@ -28,6 +28,7 @@ func RecvAndSendOne(c net.Conn, buf []byte) (mutable bool, err error) {
 	}
 
 	if Tcp {
+		//TODO: handle receive fragments
 		n, err = tconn.Read(buf)
 		raddr = tconn.RemoteAddr()
 	} else {

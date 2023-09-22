@@ -61,8 +61,8 @@ func Usage() {
 	str := `
   -h Show help message
   -d int
-        Debug level 0-3 (default 1)
-        调试级别,0. 不打印调试信息 1. 基本输出 2. 详细输出
+        Debug Output level 0-2 (default 1)
+        打印级别 0. 不打印调试信息 1. 基本输出 2. 详细输出
   -B string
         Server Binding Address, must if run as client (default "0.0.0.0")
         服务端绑定的地址,服务端可选,客户端必填
