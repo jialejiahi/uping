@@ -95,7 +95,7 @@ func Usage() {
         发包间隔,单位毫秒,默认值100
   -c int
         Request Count, Client Only (default 10)
-        请求个数, 如果不指定,则持续发送直到收到退出信号
+        请求个数, client 发送探测请求的个数
   -t int
         Receive Timeout in ms, Client Only (default 1000)
         请求报文无应答的超时时间,单位毫秒,默认值1000
