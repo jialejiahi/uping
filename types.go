@@ -59,3 +59,13 @@ type StatPerServer struct {
 
 const MaxPktLen = 9500
 const MinPktLen = 64
+
+type SeqError struct {
+    Msg string
+}
+
+func (e *SeqError) Error() string {
+    return e.Msg
+}
+
+var SendSeqError SeqError = SeqError{Msg: "send seq out of range"}

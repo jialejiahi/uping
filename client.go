@@ -49,9 +49,15 @@ func SendOne(sindex int, c net.Conn, seq uint64, payload []byte) (err error) {
 	n, err := c.Write(buf.Bytes());
 	if err != nil {
 		fmt.Println(err)
-		return err
+		return
 	}
 	timeStamp := time.Now()
+	if seq >= uint64(len(serverStatSlice[sindex].ReqStats)) {
+		fmt.Printf("send seq out of range: seq=%d, len=%d, server index=%d, remote=%v\n",
+			seq, len(serverStatSlice[sindex].ReqStats), sindex, c.RemoteAddr())
+		err = &SendSeqError
+		return
+	}
 	serverStatSlice[sindex].ReqLock.Lock()
 	serverStatSlice[sindex].ReqStats[seq].TimeStamp = timeStamp
 	serverStatSlice[sindex].ReqLock.Unlock()
@@ -89,7 +95,7 @@ func RecvOne(wg *sync.WaitGroup, sindex int, conn net.Conn, seq uint64) (err err
 	}
 
 	if err != nil {
-		fmt.Printf("seq %d: %s\n", ID, err.Error())
+		fmt.Printf("read error, last sent seq is %d: %s\n", seq, err.Error())
 		return err
 	}
 	if n <= 0 {
@@ -117,6 +123,13 @@ func RecvOne(wg *sync.WaitGroup, sindex int, conn net.Conn, seq uint64) (err err
 		TimeStamp: time.Now(),
 		Rtt: rtt,
 	}
+	if resp.Seq >= uint64(len(serverStatSlice[sindex].ReqStats)) {
+		fmt.Printf("receive seq out of range: seq=%d, len=%d, server index=%d, remote=%v\n",
+			resp.Seq, len(serverStatSlice[sindex].ReqStats), sindex, conn.RemoteAddr())
+		err = &SeqError{ Msg: "receive seq out of range"}
+		return
+	}
+
 	i := get_stat_for_name(sindex, name)
 	serverStatSlice[sindex].StatPerNames[i].RespLock.Lock()
 	serverStatSlice[sindex].StatPerNames[i].RespStats = append(serverStatSlice[sindex].StatPerNames[i].RespStats, respStat)
@@ -333,6 +346,12 @@ func SendAndRecvPerServer(wg *sync.WaitGroup, caddr net.IP, sindex int) {
 					break
 				}
 			}
+		}
+		//why write fail or seq out of range here?
+		if errors.Is(err, &SendSeqError) {
+			fmt.Printf("seq = %d, send seq error: %s\n", seq, err)
+			delay()
+			continue
 		}
 		wg1.Add(1)
 		go RecvOne(&wg1, sindex, c, seq)

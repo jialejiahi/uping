@@ -2,10 +2,12 @@
 INSTALL_DIR=/data/share/tools
 DIR=$(shell pwd)
 
+current_time := $(shell date +%Y-%m-%d_%H:%M:%S)
+
 all:
 	go mod tidy
-	go build -ldflags '-extldflags "-fno-PIC -static"' -o uping
-	GOOS=linux GOARCH=arm64 go build -ldflags '-extldflags "-fno-PIC -static"' -o upingarm
+	go build -ldflags '-extldflags "-fno-PIC -static" -X main.buildtime=${current_time}' -o uping
+	GOOS=linux GOARCH=arm64 go build -ldflags '-extldflags "-fno-PIC -static" -X main.buildtime=${current_time}' -o upingarm
 
 # aarch64 compile
 arm:

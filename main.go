@@ -29,6 +29,7 @@ var (
 )
 
 var Interrupted bool
+var buildtime string
 
 func init() {
 	flag.BoolVar(&help, "h", false, "Show the help message")
@@ -100,6 +101,7 @@ func Usage() {
         Receive Timeout in ms, Client Only (default 1000)
         请求报文无应答的超时时间,单位毫秒,默认值1000
 `
+	fmt.Printf("Build Time is: %s\n", buildtime)
 	fmt.Print(str)
 }
 
