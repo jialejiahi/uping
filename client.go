@@ -162,6 +162,8 @@ func get_all_stats() {
 			continue
 		}
 		var maxRttSeq uint64 = 0
+		//record at most five lost packet sequences for analysition
+		var lostSeqs []uint64
 		for i, reqStat := range s.ReqStats {
 			if i != int(reqStat.Seq) {
 				fmt.Printf("seq=%d not equal slice index %d", reqStat.Seq, i)	
@@ -177,6 +179,13 @@ func get_all_stats() {
 				}
 				s.RespNum++
 			} else {
+				if len(lostSeqs) < 5 {
+					lostSeqs = append(lostSeqs, reqStat.Seq)
+				}
+				if Dbglvl > 1 {
+					fmt.Printf("seq=%d packet lost\n", reqStat.Seq)
+				}
+				s.LostNum++
 				if Dbglvl > 1 {
 					fmt.Printf("seq=%d packet lost\n", reqStat.Seq)
 				}
@@ -199,6 +208,10 @@ func get_all_stats() {
 				fmt.Printf("send/recv packets number may not match if tcp mutable sport(-m) is not set!\n")
 			} else {
 				fmt.Printf("estimate network failure time: %s\n", time.Duration(s.LostNum) * time.Duration(Interval) * time.Millisecond)
+				fmt.Printf("print at most 5 no-response packet sequences and their send timestamps:\n")
+				for _, seq := range lostSeqs {
+					fmt.Printf("no-response packet seq=%d timestamp=%v\n", seq, s.ReqStats[seq].TimeStamp)
+				}
 			}
 		}
 		if len(s.StatPerNames) > 1 {
