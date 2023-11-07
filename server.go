@@ -38,7 +38,10 @@ func RecvAndSendOne(c net.Conn, buf []byte) (mutable bool, err error) {
 		fmt.Println("read error:", err)
 		return
 	}
-	if n <= 0 {
+	if n < 12 {
+		if Dbglvl > 1 {
+			fmt.Printf("invalid request of length %d\n", n)
+		}
 		return
 	}
 	if Dbglvl > 1 {
@@ -78,7 +81,9 @@ func RecvAndSendOne(c net.Conn, buf []byte) (mutable bool, err error) {
 	var rbuf bytes.Buffer
 	binary.Write(&rbuf, binary.BigEndian, &resp)
 	binary.Write(&rbuf, binary.BigEndian, []byte(Name))
-	binary.Write(&rbuf, binary.BigEndian, buf[16+resp.NameLen:n])
+	if (n > int(16 + resp.NameLen)) {
+		binary.Write(&rbuf, binary.BigEndian, buf[16+resp.NameLen:n])
+	}
 	rbufBytes := rbuf.Bytes()
 	if Dbglvl > 1 {
 		for i := 0; i < 64; i++ {

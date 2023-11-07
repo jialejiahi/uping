@@ -105,14 +105,30 @@ func RecvOne(wg *sync.WaitGroup, sindex int, conn net.Conn, seq uint64) (err err
 	if MutSport && conn != nil {
 		conn.Close()
 	}
+	if n < 16 {
+		if Dbglvl > 1 {
+			fmt.Printf("received invalid length %d bytes from %s\n", n, raddr)
+		}
+		return fmt.Errorf("received invalid length %d bytes from %s", n, raddr)
+	}
 	resp := RespHeader{
 		Id:	  binary.BigEndian.Uint32(buf[0:4]),
 		Seq:   binary.BigEndian.Uint64(buf[4:12]),
 		NameLen: binary.BigEndian.Uint32(buf[12:16]),
 	}
 
+	if resp.Id != ID {
+		fmt.Printf("received invalid id: %d, expected %d\n", resp.Id, ID)
+		return fmt.Errorf("received invalid id: %d, expected %d", resp.Id, ID)
+	}
 	if Dbglvl > 1 {
 		fmt.Printf("Resp header is %v\n", resp)
+	}
+	if n < int(16 + resp.NameLen) {
+		if Dbglvl > 1 {
+			fmt.Printf("received invalid length %d bytes from %s\n", n, raddr)
+		}
+		return fmt.Errorf("received invalid length %d bytes from %s", n, raddr)
 	}
 	name := string(buf[16:16+resp.NameLen])
 
@@ -394,6 +410,7 @@ func client_main(saddr net.IP, caddr net.IP, plist []uint16) {
 			PayloadLen, Interval, Count, Timeout)
 	}
 	ID = rand.Uint32()	
+	//ID = 0x55aa0000
 	if MutSport {
 		ID = ID | 0x00000001 	
 	} else {
