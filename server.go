@@ -86,7 +86,7 @@ func RecvAndSendOne(c net.Conn, buf []byte) (mutable bool, err error) {
 	}
 	rbufBytes := rbuf.Bytes()
 	if Dbglvl > 1 {
-		for i := 0; i < 64; i++ {
+		for i := 0; i < len(rbufBytes) && i < 64; i++ {
 			fmt.Printf("%02x ", rbufBytes[i])
 		}
 		fmt.Println("")
