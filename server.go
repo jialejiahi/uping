@@ -59,6 +59,11 @@ func RecvAndSendOne(c net.Conn, buf []byte) (mutable bool, err error) {
 	    Id:	  binary.BigEndian.Uint32(buf[0:4]),
 		Seq:   binary.BigEndian.Uint64(buf[4:12]),
 	}
+	if Check {
+		if req.Id & 0xffff0000 != 0x55aa0000 {
+			return
+		}
+	}
 	if req.Id & 0x00000001 != 0 {
 		//mutable
 		mutable = true

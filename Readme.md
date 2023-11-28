@@ -53,6 +53,7 @@ ping 是测试连通性和时延的工具,简单易用, 但有时候我们需要
 | ---- | -------------------------------------- | ---------- |
 | -s   | server 端,否则作为 client             | 服务端必填 |
 | -n   | name, 负载均衡场景用于区分多个 server | hostname   |
+| -C   | check request id flag, 检查request是否是uping发来的 | false   |
 
 客户端参数
 

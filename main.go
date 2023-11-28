@@ -26,6 +26,7 @@ var (
 	Count      uint64 //发送报文的数量
 	Timeout    int //认为报文无应答的超时时间
 	Tcp 	   bool //use tcp, default false
+	Check	   bool //check request format on serverside, default false, Server Only
 )
 
 var Interrupted bool
@@ -40,6 +41,7 @@ func init() {
 
 	flag.BoolVar(&IsServer, "s", false, "Run as server, Server Only")
 	flag.StringVar(&Name, "n", "", "Server Host Name, Get Host Name if it's not given, Server Only")
+	flag.BoolVar(&Check, "C", false, "Check request format on serverside, default false, Server Only")
 
 	flag.StringVar(&CAddr, "b", "0.0.0.0", "Client Binding Address, Client Only")
 	flag.IntVar(&CPort, "p", 0, "Client Binding Port, Client Only")
@@ -79,6 +81,9 @@ func Usage() {
   -n name
         Server Name, Get Hostname if it's not given
         服务端指定,用于客户端区分多个server,不指定时获取系统Hostname
+  -C bool
+        Check Request format on serverside (default false)
+        服务端收包时是否检查请求格式
   -b string
         Client Binding Address, Client Only (default "0.0.0.0")
         client端绑定的地址, 不指定则不绑定

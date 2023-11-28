@@ -409,8 +409,8 @@ func client_main(saddr net.IP, caddr net.IP, plist []uint16) {
 		fmt.Printf("Params Payload Len:%d, Inteval:%d, Count:%d, Timeout:%d\n",
 			PayloadLen, Interval, Count, Timeout)
 	}
-	ID = rand.Uint32()	
-	//ID = 0x55aa0000
+	ID = rand.Uint32()
+	ID = 0x55aa0000 | (ID & 0x00001111)
 	if MutSport {
 		ID = ID | 0x00000001 	
 	} else {
