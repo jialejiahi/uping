@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"syscall"
+	"time"
 
 	"golang.org/x/sys/unix"
 )
@@ -86,7 +87,7 @@ func ListenPacket(network, address string) (net.PacketConn, error) {
 // Dial dials the given network and address. see net.Dialer.Dial
 // Returns a net.Conn created from a file descriptor for a socket
 // with SO_REUSEPORT and SO_REUSEADDR option set.
-func Dial(network, laddr, raddr string) (net.Conn, error) {
+func Dial(network, laddr, raddr string, timeout time.Duration) (net.Conn, error) {
 	//timeout in ms
 	nla, err := ResolveAddr(network, laddr)
 	if err != nil {
@@ -95,6 +96,7 @@ func Dial(network, laddr, raddr string) (net.Conn, error) {
 	d := net.Dialer{
 		Control:   Control,
 		LocalAddr: nla,
+		Timeout:   timeout * time.Millisecond,
 	}
 	return d.Dial(network, raddr)
 }

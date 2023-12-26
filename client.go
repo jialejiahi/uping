@@ -295,7 +295,7 @@ func SendAndRecvPerServer(wg *sync.WaitGroup, caddr net.IP, sindex int) {
 		if !Tcp {
 			raddr := &net.UDPAddr{IP: serverStatSlice[sindex].Saddr, Port: serverStatSlice[sindex].Sport}
 			laddr := &net.UDPAddr{IP: caddr, Port: CPort}
-			c, err = Dial("udp", laddr.String(), raddr.String())
+			c, err = Dial("udp", laddr.String(), raddr.String(), time.Duration(5000))
 			if err != nil {
 				fmt.Printf("dial error: %s\n", err)
 				return
@@ -303,7 +303,7 @@ func SendAndRecvPerServer(wg *sync.WaitGroup, caddr net.IP, sindex int) {
 		} else {
 			raddr := &net.TCPAddr{IP: serverStatSlice[sindex].Saddr, Port: serverStatSlice[sindex].Sport}
 			laddr := &net.TCPAddr{IP: caddr, Port: CPort}
-			c, err = Dial("tcp", laddr.String(), raddr.String())
+			c, err = Dial("tcp", laddr.String(), raddr.String(), time.Duration(5000))
 			if err != nil {
 				fmt.Printf("dial error: %s\n", err)
 				return
@@ -340,7 +340,7 @@ func SendAndRecvPerServer(wg *sync.WaitGroup, caddr net.IP, sindex int) {
 	   		if !Tcp {
 				raddr := &net.UDPAddr{IP: serverStatSlice[sindex].Saddr, Port: serverStatSlice[sindex].Sport}
 				laddr := &net.UDPAddr{IP: caddr}
-				c, err = Dial("udp", laddr.String(), raddr.String())
+				c, err = Dial("udp", laddr.String(), raddr.String(), time.Duration(Interval))
 				if err != nil {
 					fmt.Printf("seq = %d, dial error: %s\n", seq, err)
 					seq++
@@ -350,7 +350,12 @@ func SendAndRecvPerServer(wg *sync.WaitGroup, caddr net.IP, sindex int) {
 			} else {
 				raddr := &net.TCPAddr{IP: serverStatSlice[sindex].Saddr, Port: serverStatSlice[sindex].Sport}
 				laddr := &net.TCPAddr{IP: caddr}
-				c, err = Dial("tcp", laddr.String(), raddr.String())
+				//for tcp short connection, timeout should not be too short, multiple it with 10
+				if Interval < 10 {
+					c, err = Dial("tcp", laddr.String(), raddr.String(), time.Duration(Interval * 10))
+				} else {
+					c, err = Dial("tcp", laddr.String(), raddr.String(), time.Duration(Interval))
+				}
 				if err != nil {
 					fmt.Printf("seq = %d, dial error: %s\n", seq, err)
 					seq++
