@@ -127,6 +127,31 @@ func GetPortList(pliststr string) (plist []uint16, err error) {
 	return
 }
 
+// server 端并发接收设置
+// 设大listen backlog
+// sysctl -w net.core.somaxconn=1024
+// 关闭syn cookie
+// sysctl -w net.ipv4.tcp_syncookies=0
+func set_server_syn_backlog_cookie() {
+	f, err := os.OpenFile("/proc/sys/net/core/somaxconn", os.O_RDWR, 0)
+	if err != nil {
+		fmt.Printf("open /proc/sys/net/core/somaxconn error: %s", err.Error())
+		return	
+	}
+	defer f.Close()
+	//default is 128
+	f.WriteString("1024")
+
+	f, err = os.OpenFile("/proc/sys/net/ipv4/tcp_syncookies", os.O_RDWR, 0)
+	if err != nil {
+		fmt.Printf("open /proc/sys/net/ipv4/tcp_syncookies error: %s", err.Error())
+		return	
+	}
+	defer f.Close()
+	//default is 1
+	f.WriteString("0")
+}
+
 func set_socket_buf_size() {
 	f, err := os.OpenFile("/proc/sys/net/core/rmem_max", os.O_RDWR, 0)
 	if err != nil {
@@ -203,6 +228,7 @@ func main() {
 			return
 		}
 		set_socket_buf_size()
+		set_server_syn_backlog_cookie()
 		server_main(saddr, plist)
 	}
 }

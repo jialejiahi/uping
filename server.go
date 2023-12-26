@@ -115,6 +115,7 @@ func RecvAndSendOne(c net.Conn, buf []byte) (mutable bool, err error) {
 func HandleTcpLis(wg *sync.WaitGroup, lis *net.TCPListener) {
 	defer wg.Done()
 	var wg1 sync.WaitGroup
+
 	for !Interrupted {
 		conn, err := lis.AcceptTCP()
 		if err != nil {
@@ -192,6 +193,7 @@ func server_main(saddr net.IP, plist []uint16) {
 				fmt.Println("listen error:", err)
 				return
 			}
+
 			tlisteners = append(tlisteners, lis.(*net.TCPListener))
 		}
 	}

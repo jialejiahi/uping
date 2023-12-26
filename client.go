@@ -36,9 +36,9 @@ func get_stat_for_name(server_index int, name string) int {
 }
 
 //construct and send one packet
-func SendOne(sindex int, c net.Conn, seq uint64, payload []byte) (err error) {
+func SendOne(sindex int, c net.Conn, seq uint64, noWriteFlag bool, payload []byte) (err error) {
 	var buf bytes.Buffer
-	c.SetWriteDeadline(time.Now().Add(time.Duration(Timeout) * time.Millisecond))
+	var n int
 	req := ReqHeader {
 		Id: ID,
 		Seq: seq,
@@ -46,10 +46,16 @@ func SendOne(sindex int, c net.Conn, seq uint64, payload []byte) (err error) {
 	binary.Write(&buf, binary.BigEndian, &req)
 	binary.Write(&buf, binary.BigEndian, payload[:])
 
-	n, err := c.Write(buf.Bytes());
-	if err != nil {
-		fmt.Println(err)
-		return
+	if !noWriteFlag {
+		c.SetWriteDeadline(time.Now().Add(time.Duration(Timeout) * time.Millisecond))
+		n, err = c.Write(buf.Bytes());
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+	} else {
+		n = 0	
+		err = nil
 	}
 	timeStamp := time.Now()
 	if seq >= uint64(len(serverStatSlice[sindex].ReqStats)) {
@@ -343,6 +349,8 @@ func SendAndRecvPerServer(wg *sync.WaitGroup, caddr net.IP, sindex int) {
 				c, err = Dial("udp", laddr.String(), raddr.String(), time.Duration(Interval))
 				if err != nil {
 					fmt.Printf("seq = %d, dial error: %s\n", seq, err)
+					//dial fail, save a req stat because we tried, fake send
+					SendOne(sindex, c, seq, true, payload)
 					seq++
 					delay()
 					continue
@@ -358,6 +366,8 @@ func SendAndRecvPerServer(wg *sync.WaitGroup, caddr net.IP, sindex int) {
 				}
 				if err != nil {
 					fmt.Printf("seq = %d, dial error: %s\n", seq, err)
+					//dial fail, save a req stat because we tried, fake send
+					SendOne(sindex, c, seq, true, payload)
 					seq++
 					delay()
 					continue
@@ -368,7 +378,7 @@ func SendAndRecvPerServer(wg *sync.WaitGroup, caddr net.IP, sindex int) {
 		}
 
 		//send_and_recv()
-		err = SendOne(sindex, c, seq, payload)
+		err = SendOne(sindex, c, seq, false, payload)
 		if Tcp {
 			if errors.Is(err, syscall.EPIPE) || errors.Is(err, syscall.ECONNRESET) {
 				if MutSport {
