@@ -208,10 +208,6 @@ func get_all_stats() {
 					fmt.Printf("seq=%d packet lost\n", reqStat.Seq)
 				}
 				s.LostNum++
-				if Dbglvl > 1 {
-					fmt.Printf("seq=%d packet lost\n", reqStat.Seq)
-				}
-				s.LostNum++
 			}
 		}
 		fmt.Printf("%d packets transmitted, %d received, %d packet loss\n", len(s.ReqStats), s.RespNum, s.LostNum)
