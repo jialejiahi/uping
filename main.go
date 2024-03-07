@@ -20,7 +20,7 @@ var (
 	Name       string //server name, default is hostname
 	CAddr      string
 	CPort      int
-	MutSport   bool
+	MutCT   bool
 	PayloadLen int // default 64; 每个请求的负载长度
 	Interval   int //default 100, 单位ms
 	Count      uint64 //发送报文的数量
@@ -45,8 +45,7 @@ func init() {
 
 	flag.StringVar(&CAddr, "b", "0.0.0.0", "Client Binding Address, Client Only")
 	flag.IntVar(&CPort, "p", 0, "Client Binding Port, Client Only")
-	flag.BoolVar(&MutSport, "m", false, "Mutable Source Port, Client Only")
-	//flag.BoolVar(&USInterval, "u", false, "Mutable Source Port, Client Only")
+	flag.BoolVar(&MutCT, "m", false, "Mutable Connection(close connection every packet), Client Only")
 	flag.IntVar(&PayloadLen, "l", 64, "Payload Length, Client Only")
 	flag.IntVar(&Interval, "i", 100, "New Request Interval in ms, Client Only")
 	flag.Uint64Var(&Count, "c", 10, "Requests per data socket, Client Only")
@@ -89,10 +88,10 @@ func Usage() {
         client端绑定的地址, 不指定则不绑定
   -p int
         Client Binding Port, Client Only (default 0)
-        client端绑定的端口,不绑定则每次发包使用随机值
+        client端绑定的端口,不绑定则使用随机值
   -m bool
-        Client Mutable Source Port, Client Only (default false)
-        客户端的端口随机变化, 默认false
+        Client Mutable Connection, Client Only (default false)
+        使用短连接发包, 每次发包时新建连接，完成后断开, 默认false
   -l int
         Requests Length, Client Only (default 64)
         请求负载的长度, 最小取值64字节, 以容纳自定义负载头部

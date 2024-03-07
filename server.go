@@ -127,12 +127,12 @@ func HandleTcpLis(wg *sync.WaitGroup, lis *net.TCPListener) {
 		}
 		SetTcpConnOptions(conn)
 		buf := make([]byte, MaxPktLen+128)
-		mutsport, e := RecvAndSendOne(conn, buf)
+		MutCT, e := RecvAndSendOne(conn, buf)
 		if e != nil {
 			conn.Close()	
 			continue
 		}
-		if mutsport {
+		if MutCT {
 			conn.Close()	
 		} else {
 			wg1.Add(1)

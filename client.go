@@ -108,7 +108,7 @@ func RecvOne(wg *sync.WaitGroup, sindex int, conn net.Conn, seq uint64) (err err
 		fmt.Printf("received zero bytes from %s\n", raddr)
 		return fmt.Errorf("received zero bytes from %s", raddr)
 	}
-	if MutSport && conn != nil {
+	if MutCT && conn != nil {
 		conn.Close()
 	}
 	if n < 16 {
@@ -221,15 +221,13 @@ func get_all_stats() {
 			fmt.Printf("successful requests rtt avg/max = %s/%s, max rtt seq is %d\n", s.AvgRtt, s.MaxRtt, maxRttSeq)
 		}
 		if s.LostNum > 0 {
-			if Tcp && !MutSport {
-				//TODO: handle recv combined packet(two payload in one packet)
-				fmt.Printf("send/recv packets number may not match if tcp mutable sport(-m) is not set!\n")
-			} else {
-				fmt.Printf("estimate network failure time: %s\n", time.Duration(s.LostNum) * time.Duration(Interval) * time.Millisecond)
-				fmt.Printf("print at most 5 no-response packet sequences and their send timestamps:\n")
-				for _, seq := range lostSeqs {
-					fmt.Printf("no-response packet seq=%d timestamp=%v\n", seq, s.ReqStats[seq].TimeStamp)
-				}
+			if Tcp && !MutCT {
+				fmt.Printf("send/recv packets number may not match if tcp mutable ct(-m) is not set!\n")
+			}
+			fmt.Printf("estimate network failure time: %s\n", time.Duration(s.LostNum) * time.Duration(Interval) * time.Millisecond)
+			fmt.Printf("print at most 5 no-response packet sequences and their send timestamps:\n")
+			for _, seq := range lostSeqs {
+				fmt.Printf("no-response packet seq=%d timestamp=%v\n", seq, s.ReqStats[seq].TimeStamp)
 			}
 		}
 		if len(s.StatPerNames) > 1 {
@@ -293,10 +291,15 @@ func SendAndRecvPerServer(wg *sync.WaitGroup, caddr net.IP, sindex int) {
 	var seq uint64 = 0
 	var c net.Conn = nil
 	var err error
-	if !MutSport {
+	if !MutCT {
 		if !Tcp {
 			raddr := &net.UDPAddr{IP: serverStatSlice[sindex].Saddr, Port: serverStatSlice[sindex].Sport}
-			laddr := &net.UDPAddr{IP: caddr, Port: CPort}
+			var laddr *net.UDPAddr
+			if CPort != 0 {
+			    laddr = &net.UDPAddr{IP: caddr, Port: CPort}
+			} else {
+			    laddr = &net.UDPAddr{IP: caddr, Port: CPort}
+			}
 			c, err = Dial("udp", laddr.String(), raddr.String(), time.Duration(5000))
 			if err != nil {
 				fmt.Printf("dial error: %s\n", err)
@@ -304,7 +307,12 @@ func SendAndRecvPerServer(wg *sync.WaitGroup, caddr net.IP, sindex int) {
 			}
 		} else {
 			raddr := &net.TCPAddr{IP: serverStatSlice[sindex].Saddr, Port: serverStatSlice[sindex].Sport}
-			laddr := &net.TCPAddr{IP: caddr, Port: CPort}
+			var laddr *net.TCPAddr
+			if CPort != 0 {
+			    laddr = &net.TCPAddr{IP: caddr, Port: CPort}
+			} else {
+			    laddr = &net.TCPAddr{IP: caddr, Port: CPort}
+			}
 			c, err = Dial("tcp", laddr.String(), raddr.String(), time.Duration(5000))
 			if err != nil {
 				fmt.Printf("dial error: %s\n", err)
@@ -336,12 +344,18 @@ func SendAndRecvPerServer(wg *sync.WaitGroup, caddr net.IP, sindex int) {
 		})
 		serverStatSlice[sindex].ReqLock.Unlock()
 
-		if MutSport {
+		if MutCT {
 			// c, err = net.DialUDP("udp", &net.UDPAddr{IP: caddr },
 				//   &net.UDPAddr{IP: serverStatSlice[sindex].Saddr, Port: serverStatSlice[sindex].Sport})	
 	   		if !Tcp {
 				raddr := &net.UDPAddr{IP: serverStatSlice[sindex].Saddr, Port: serverStatSlice[sindex].Sport}
-				laddr := &net.UDPAddr{IP: caddr}
+
+			    var laddr *net.UDPAddr
+			    if CPort != 0 {
+			        laddr = &net.UDPAddr{IP: caddr, Port: CPort}
+			    } else {
+			        laddr = &net.UDPAddr{IP: caddr, Port: CPort}
+			    }
 				c, err = Dial("udp", laddr.String(), raddr.String(), time.Duration(Interval))
 				if err != nil {
 					fmt.Printf("seq = %d, dial error: %s\n", seq, err)
@@ -353,7 +367,12 @@ func SendAndRecvPerServer(wg *sync.WaitGroup, caddr net.IP, sindex int) {
 				}
 			} else {
 				raddr := &net.TCPAddr{IP: serverStatSlice[sindex].Saddr, Port: serverStatSlice[sindex].Sport}
-				laddr := &net.TCPAddr{IP: caddr}
+                var laddr *net.TCPAddr
+			    if CPort != 0 {
+			        laddr = &net.TCPAddr{IP: caddr, Port: CPort}
+			    } else {
+			        laddr = &net.TCPAddr{IP: caddr, Port: CPort}
+			    }
 				//for tcp short connection, timeout should not be too short, multiple it with 10
 				if Interval < 10 {
 					c, err = Dial("tcp", laddr.String(), raddr.String(), time.Duration(Interval * 10))
@@ -377,7 +396,7 @@ func SendAndRecvPerServer(wg *sync.WaitGroup, caddr net.IP, sindex int) {
 		err = SendOne(sindex, c, seq, false, payload)
 		if Tcp {
 			if errors.Is(err, syscall.EPIPE) || errors.Is(err, syscall.ECONNRESET) {
-				if MutSport {
+				if MutCT {
 					seq++
 					delay()
 					continue
@@ -422,7 +441,7 @@ func client_main(saddr net.IP, caddr net.IP, plist []uint16) {
 	}
 	ID = rand.Uint32()
 	ID = 0x55aa0000 | (ID & 0x00001111)
-	if MutSport {
+	if MutCT {
 		ID = ID | 0x00000001 	
 	} else {
 		ID = ID & 0xfffffffe
