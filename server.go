@@ -23,6 +23,7 @@ func RecvAndSendOne(c net.Conn, buf []byte) (mutable bool, err error) {
 
 	if Tcp {
 		tconn = c.(*net.TCPConn)
+		SetTcpConnQuickAck(tconn)
 	} else {
 		uconn = c.(*net.UDPConn)
 	}

@@ -46,6 +46,9 @@ func SendOne(sindex int, c net.Conn, seq uint64, noWriteFlag bool, payload []byt
 	binary.Write(&buf, binary.BigEndian, &req)
 	binary.Write(&buf, binary.BigEndian, payload[:])
 
+	if Tcp {
+		SetTcpConnQuickAck(c.(*net.TCPConn))
+	}
 	if !noWriteFlag {
 		c.SetWriteDeadline(time.Now().Add(time.Duration(Timeout) * time.Millisecond))
 		n, err = c.Write(buf.Bytes());

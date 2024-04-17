@@ -25,29 +25,50 @@ func ResolveAddr(network, address string) (net.Addr, error) {
 	}
 }
 
+func SetTcpConnQuickAck(c *net.TCPConn) error {
+	rc, _ := c.SyscallConn()
+	rc.Control(func(fd uintptr) {
+		if EnableQuickAck {
+			unix.SetsockoptInt(int(fd), unix.SOL_TCP, unix.TCP_QUICKACK, 1)
+		} else {
+			unix.SetsockoptInt(int(fd), unix.SOL_TCP, unix.TCP_QUICKACK, 0)
+		}
+	})
+	return nil
+}
+
 func SetTcpConnOptions(c *net.TCPConn) error {
-	var err error
 
-
-	c.SetNoDelay(true)
+	//决定了何时发送Payload，开启了则write时会攒包，到MSS或者收到ACK后才发
+	//因为正常情况下uping探测是1发1收，所以不会出现两个连续的发送，造成攒包，这个参数通常无影响
+	//除非server->client方向有超时，才会造成攒包，这样丢包就更严重了，所以这个参数一般不用
+	c.SetNoDelay(DisableNoDelay)
+	//是否使用rst断开连接
 	c.SetLinger(0)
 
-	f, _ := c.File()
-	defer f.Close()
+	rc, _ := c.SyscallConn()
+	rc.Control(func(fd uintptr) {
+	    //决定了是否等待数据完整了再发送, 设置为1的话，一定会攒包，影响小包探测了
+		unix.SetsockoptInt(int(fd), unix.SOL_TCP, unix.TCP_CORK, 0)
+		//if DisableNoDelay {
+		//	unix.SetsockoptInt(int(fd), unix.SOL_TCP, unix.TCP_CORK, 0)
+		//} else {
+		//	unix.SetsockoptInt(int(fd), unix.SOL_TCP, unix.TCP_CORK, 1)
+		//}
+	    //决定了是否可以在syn中携带数据，如果要携带，程序中还需要指定cookie，客户端还有个TCP_FASTOPEN_CONNECT选项
+	    //这个设置当前其实没用
+		//unix.SetsockoptInt(int(fd), unix.SOL_TCP, unix.TCP_FASTOPEN, 0)
+	    // 决定了合适发送Ack， 开启了发送ack可能延迟，延迟到有数据发送或者定时器超时
+		//unix.SetsockoptInt(int(fd), unix.SOL_TCP, unix.TCP_QUICKACK, 0)
+		// 早设置一遍QuickAck
+		//if EnableQuickAck {
+		//	unix.SetsockoptInt(int(fd), unix.SOL_TCP, unix.TCP_QUICKACK, 1)
+		//} else {
+		//	unix.SetsockoptInt(int(fd), unix.SOL_TCP, unix.TCP_QUICKACK, 0)
+		//}
+	})
 
-	err = unix.SetsockoptInt(int(f.Fd()), unix.SOL_TCP, unix.TCP_CORK, 0)
-	if err != nil {
-		return err
-	}
-	err = unix.SetsockoptInt(int(f.Fd()), unix.SOL_TCP, unix.TCP_FASTOPEN, 0)
-	if err != nil {
-		return err
-	}
-	err = unix.SetsockoptInt(int(f.Fd()), unix.SOL_TCP, unix.TCP_QUICKACK, 0)
-	if err != nil {
-		return err
-	}
-	return err
+	return nil
 }
 
 func Control(network, address string, c syscall.RawConn) error {
@@ -61,6 +82,13 @@ func Control(network, address string, c syscall.RawConn) error {
 		err = unix.SetsockoptInt(int(fd), unix.SOL_SOCKET, unix.SO_REUSEPORT, 1)
 		if err != nil {
 			return
+		}
+		if Tcp {
+		    if EnableQuickAck {
+		        unix.SetsockoptInt(int(fd), unix.SOL_TCP, unix.TCP_QUICKACK, 1)
+		    } else {
+		        unix.SetsockoptInt(int(fd), unix.SOL_TCP, unix.TCP_QUICKACK, 0)
+		    }
 		}
 	})
 	return err

@@ -27,6 +27,8 @@ var (
 	Timeout    int //认为报文无应答的超时时间
 	Tcp 	   bool //use tcp, default false
 	Check	   bool //check request format on serverside, default false, Server Only
+	DisableNoDelay bool      //disable nodelay on tcp sockets
+	EnableQuickAck bool      //enable quick ack on tcp sockets
 )
 
 var Interrupted bool
@@ -38,6 +40,8 @@ func init() {
 	flag.StringVar(&SAddr, "B", "0.0.0.0", "Server Binding Address, Must be set if run as Client")
 	flag.StringVar(&SPortList, "P", "23456,23457", "Server Data Port List")
 	flag.BoolVar(&Tcp, "T", false, "Use TCP Protocol, default false")
+	flag.BoolVar(&DisableNoDelay, "D", false, "Disable NoDelay on tcp sockets, default false")
+	flag.BoolVar(&EnableQuickAck, "Q", false, "Enable Quick Ack on tcp sockets, default false")
 
 	flag.BoolVar(&IsServer, "s", false, "Run as server, Server Only")
 	flag.StringVar(&Name, "n", "", "Server Host Name, Get Host Name if it's not given, Server Only")
@@ -74,6 +78,12 @@ func Usage() {
   -T bool
         Use tcp instead of udp for ping (default false)
         使用tcp协议而不是udp, 默认false
+  -D bool
+        Disable NoDelay on tcp sockets (default false)
+        关闭tcp协议的NoDelay选项,将会启用Nagle算法,合并小包发送,对丢包探测有影响，不建议设置
+  -Q bool
+        Enable Quick Ack on tcp sockets (default false)
+        开启tcp协议的QuickAck选项,开启后将会立即回复Ack小包,不等待发包时携带
   -s bool
         Run as server (default false)
         作为server运行,不指定则作为client运行
