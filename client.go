@@ -47,7 +47,13 @@ func SendOne(sindex int, c net.Conn, seq uint64, noWriteFlag bool, payload []byt
 	binary.Write(&buf, binary.BigEndian, payload[:])
 
 	if Tcp {
-		SetTcpConnQuickAck(c.(*net.TCPConn))
+
+	    if Ssl {
+		    tconn := c.(CustomTLSConn).GetOriginalConn().(*net.TCPConn)
+		    SetTcpConnQuickAck(tconn)
+		} else {
+		    SetTcpConnQuickAck(c.(*net.TCPConn))
+		}
 	}
 	if !noWriteFlag {
 		c.SetWriteDeadline(time.Now().Add(time.Duration(Timeout) * time.Millisecond))
@@ -89,7 +95,11 @@ func RecvOne(wg *sync.WaitGroup, sindex int, conn net.Conn, seq uint64) (err err
 	var tconn *net.TCPConn
 
 	if Tcp {
-		tconn = conn.(*net.TCPConn)
+	    if Ssl {
+		    tconn = conn.(CustomTLSConn).GetOriginalConn().(*net.TCPConn)
+		} else {
+		    tconn = conn.(*net.TCPConn)
+		}
 		tconn.SetReadDeadline(time.Now().Add(time.Duration(Timeout) * time.Millisecond))
 	} else {
 		uconn = conn.(*net.UDPConn)
@@ -97,7 +107,11 @@ func RecvOne(wg *sync.WaitGroup, sindex int, conn net.Conn, seq uint64) (err err
 	}
 
 	if Tcp {
-		n, err = tconn.Read(buf)
+	    if Ssl {
+			n, err = conn.Read(buf)
+		} else {
+			n, err = tconn.Read(buf)
+		}
 		raddr = tconn.RemoteAddr()
 	} else {
 		n, raddr, err = uconn.ReadFromUDP(buf)
@@ -303,7 +317,7 @@ func SendAndRecvPerServer(wg *sync.WaitGroup, caddr net.IP, sindex int) {
 			} else {
 			    laddr = &net.UDPAddr{IP: caddr, Port: CPort}
 			}
-			c, err = Dial("udp", laddr.String(), raddr.String(), time.Duration(5000))
+			c, err = Dial("udp", laddr.String(), raddr.String(), time.Duration(5000), Ssl)
 			if err != nil {
 				fmt.Printf("dial error: %s\n", err)
 				return
@@ -316,12 +330,17 @@ func SendAndRecvPerServer(wg *sync.WaitGroup, caddr net.IP, sindex int) {
 			} else {
 			    laddr = &net.TCPAddr{IP: caddr, Port: CPort}
 			}
-			c, err = Dial("tcp", laddr.String(), raddr.String(), time.Duration(5000))
+			c, err = Dial("tcp", laddr.String(), raddr.String(), time.Duration(5000), Ssl)
 			if err != nil {
 				fmt.Printf("dial error: %s\n", err)
 				return
 			}
-			SetTcpConnOptions(c.(*net.TCPConn))
+	    	if Ssl {
+		    	tconn := c.(CustomTLSConn).GetOriginalConn().(*net.TCPConn)
+				SetTcpConnOptions(tconn)
+			} else {
+				SetTcpConnOptions(c.(*net.TCPConn))
+			}
 		}
 	}
 	var payload = make([]byte, PayloadLen-12)
@@ -359,7 +378,7 @@ func SendAndRecvPerServer(wg *sync.WaitGroup, caddr net.IP, sindex int) {
 			    } else {
 			        laddr = &net.UDPAddr{IP: caddr, Port: CPort}
 			    }
-				c, err = Dial("udp", laddr.String(), raddr.String(), time.Duration(Interval))
+				c, err = Dial("udp", laddr.String(), raddr.String(), time.Duration(Interval), Ssl)
 				if err != nil {
 					fmt.Printf("seq = %d, dial error: %s\n", seq, err)
 					//dial fail, save a req stat because we tried, fake send
@@ -378,9 +397,9 @@ func SendAndRecvPerServer(wg *sync.WaitGroup, caddr net.IP, sindex int) {
 			    }
 				//for tcp short connection, timeout should not be too short, multiple it with 10
 				if Interval < 10 {
-					c, err = Dial("tcp", laddr.String(), raddr.String(), time.Duration(Interval * 10))
+					c, err = Dial("tcp", laddr.String(), raddr.String(), time.Duration(Interval * 10), Ssl)
 				} else {
-					c, err = Dial("tcp", laddr.String(), raddr.String(), time.Duration(Interval))
+					c, err = Dial("tcp", laddr.String(), raddr.String(), time.Duration(Interval), Ssl)
 				}
 				if err != nil {
 					fmt.Printf("seq = %d, dial error: %s\n", seq, err)
@@ -390,7 +409,12 @@ func SendAndRecvPerServer(wg *sync.WaitGroup, caddr net.IP, sindex int) {
 					delay()
 					continue
 				}
-				SetTcpConnOptions(c.(*net.TCPConn))
+	    		if Ssl {
+		    		tconn := c.(CustomTLSConn).GetOriginalConn().(*net.TCPConn)
+					SetTcpConnOptions(tconn)
+				} else {
+					SetTcpConnOptions(c.(*net.TCPConn))
+				}
 			}
 			defer c.Close()
 		}

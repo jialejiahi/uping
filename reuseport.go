@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net"
 	"syscall"
@@ -111,11 +112,22 @@ func Listen(network, address string) (net.Listener, error) {
 func ListenPacket(network, address string) (net.PacketConn, error) {
 	return listenConfig.ListenPacket(context.Background(), network, address)
 }
+// CustomTLSConn wraps a tls.Conn and the original net.Conn
+type CustomTLSConn struct {
+	*tls.Conn          // Embed the tls.Conn
+	originalConn net.Conn // Store the original net.Conn
+}
+
+// GetOriginalConn returns the original net.Conn
+func (c CustomTLSConn) GetOriginalConn() net.Conn {
+	return c.originalConn
+}
 
 // Dial dials the given network and address. see net.Dialer.Dial
 // Returns a net.Conn created from a file descriptor for a socket
 // with SO_REUSEPORT and SO_REUSEADDR option set.
-func Dial(network, laddr, raddr string, timeout time.Duration) (net.Conn, error) {
+
+func Dial(network, laddr, raddr string, timeout time.Duration, ssl bool) (net.Conn, error) {
 	//timeout in ms
 	nla, err := ResolveAddr(network, laddr)
 	if err != nil {
@@ -126,5 +138,33 @@ func Dial(network, laddr, raddr string, timeout time.Duration) (net.Conn, error)
 		LocalAddr: nla,
 		Timeout:   timeout * time.Millisecond,
 	}
-	return d.Dial(network, raddr)
+	if ssl {
+	    tlsConfig := &tls.Config{
+            InsecureSkipVerify: true, // Set to true for testing purposes, but use proper certificate verification in production
+	    }
+		rawConn, err := d.Dial(network, raddr)
+        if err != nil {
+            return nil, err
+        }
+		// Upgrade the connection to TLS
+        tlsConn := tls.Client(rawConn, tlsConfig)
+
+        // Perform the TLS handshake
+        err = tlsConn.Handshake()
+        if err != nil {
+            rawConn.Close()
+            return nil, err
+        }
+
+	    return CustomTLSConn {
+		   Conn:         tlsConn,
+		   originalConn: rawConn,
+	    }, nil
+	} else {
+		rawConn, err := d.Dial(network, raddr)
+        if err != nil {
+            return nil, err
+        }
+	    return  rawConn, nil
+	}
 }

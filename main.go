@@ -26,6 +26,7 @@ var (
 	Count      uint64 //发送报文的数量
 	Timeout    int //认为报文无应答的超时时间
 	Tcp 	   bool //use tcp, default false
+	Ssl bool //use ssl, default false
 	Check	   bool //check request format on serverside, default false, Server Only
 	DisableNoDelay bool      //disable nodelay on tcp sockets
 	EnableQuickAck bool      //enable quick ack on tcp sockets
@@ -40,6 +41,7 @@ func init() {
 	flag.StringVar(&SAddr, "B", "0.0.0.0", "Server Binding Address, Must be set if run as Client")
 	flag.StringVar(&SPortList, "P", "23456,23457", "Server Data Port List")
 	flag.BoolVar(&Tcp, "T", false, "Use TCP Protocol, default false")
+	flag.BoolVar(&Ssl, "S", false, "Use SSL/TLS Protocol, default false")
 	flag.BoolVar(&DisableNoDelay, "D", false, "Disable NoDelay on tcp sockets, default false")
 	flag.BoolVar(&EnableQuickAck, "Q", false, "Enable Quick Ack on tcp sockets, default false")
 
@@ -78,6 +80,9 @@ func Usage() {
   -T bool
         Use tcp instead of udp for ping (default false)
         使用tcp协议而不是udp, 默认false
+  -S bool
+        Use ssl for tcp (default false)
+        使用SSL协议访问tcp, 默认false
   -D bool
         Disable NoDelay on tcp sockets (default false)
         关闭tcp协议的NoDelay选项,将会启用Nagle算法,合并小包发送,对丢包探测有影响，不建议设置
