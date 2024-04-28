@@ -343,7 +343,8 @@ func SendAndRecvPerServer(wg *sync.WaitGroup, caddr net.IP, sindex int) {
 			}
 		}
 	}
-	var payload = make([]byte, PayloadLen-12)
+	var RealLen int = PayloadLen
+	var payload = make([]byte, RealLen-12)
 	rand.Read(payload[:])
 
 	var wg1 sync.WaitGroup
@@ -443,6 +444,14 @@ func SendAndRecvPerServer(wg *sync.WaitGroup, caddr net.IP, sindex int) {
 		go RecvOne(&wg1, sindex, c, seq)
 		seq++
 		delay()
+		if (MaxPayloadLen != 0) {
+			RealLen++
+			if RealLen > MaxPayloadLen {
+				RealLen = PayloadLen
+			}
+			payload = make([]byte, RealLen-12)
+			rand.Read(payload[:])
+		}
 	}
 	wg1.Wait()
 }

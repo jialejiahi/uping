@@ -22,6 +22,7 @@ var (
 	CPort      int
 	MutCT   bool
 	PayloadLen int // default 64; 每个请求的负载长度
+	MaxPayloadLen int // default 0, 最大请求负载长度
 	Interval   int //default 100, 单位ms
 	Count      uint64 //发送报文的数量
 	Timeout    int //认为报文无应答的超时时间
@@ -53,6 +54,7 @@ func init() {
 	flag.IntVar(&CPort, "p", 0, "Client Binding Port, Client Only")
 	flag.BoolVar(&MutCT, "m", false, "Mutable Connection(close connection every packet), Client Only")
 	flag.IntVar(&PayloadLen, "l", 64, "Payload Length, Client Only")
+	flag.IntVar(&MaxPayloadLen, "L", 64, "Max Payload Length, Client Only")
 	flag.IntVar(&Interval, "i", 100, "New Request Interval in ms, Client Only")
 	flag.Uint64Var(&Count, "c", 10, "Requests per data socket, Client Only")
 	flag.IntVar(&Timeout, "t", 1000, "Receive Response Timeout in ms, Client Only")
@@ -110,6 +112,9 @@ func Usage() {
   -l int
         Requests Length, Client Only (default 64)
         请求负载的长度, 最小取值64字节, 以容纳自定义负载头部
+  -L int
+        Requests Max Length, Client Only (default 0)
+        设置为一个大于 -l 的值时，将会在[l,L]范围内递增负载长度
   -i int
         Request Sending Interval, Client Only (default 100)
         发包间隔,单位毫秒,默认值100
@@ -230,6 +235,12 @@ func main() {
 		if PayloadLen < MinPktLen {
 			fmt.Printf("Request at least %d, set to %d\n", MinPktLen, MinPktLen)
 			PayloadLen = 64
+		}
+		if MaxPayloadLen <= PayloadLen {
+			MaxPayloadLen = 0
+		}
+		if MaxPayloadLen > MaxPktLen {
+			MaxPayloadLen = MaxPktLen
 		}
 		set_socket_buf_size()
 		client_main(saddr, caddr, plist)
