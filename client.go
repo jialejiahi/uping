@@ -46,8 +46,7 @@ func SendOne(sindex int, c net.Conn, seq uint64, noWriteFlag bool, payload []byt
 	binary.Write(&buf, binary.BigEndian, &req)
 	binary.Write(&buf, binary.BigEndian, payload[:])
 
-	if Tcp {
-
+	if Tcp && c != nil {
 	    if Ssl {
 		    tconn := c.(CustomTLSConn).GetOriginalConn().(*net.TCPConn)
 		    SetTcpConnQuickAck(tconn)
