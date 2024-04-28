@@ -43,7 +43,7 @@ func SetTcpConnOptions(c *net.TCPConn) error {
 	//决定了何时发送Payload，开启了则write时会攒包，到MSS或者收到ACK后才发
 	//因为正常情况下uping探测是1发1收，所以不会出现两个连续的发送，造成攒包，这个参数通常无影响
 	//除非server->client方向有超时，才会造成攒包，这样丢包就更严重了，所以这个参数一般不用
-	c.SetNoDelay(!DisableNoDelay)
+	c.SetNoDelay(NoDelay)
 	//是否使用rst断开连接
 	c.SetLinger(0)
 
