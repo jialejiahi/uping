@@ -6,12 +6,12 @@ current_time := $(shell date +%Y-%m-%d_%H:%M:%S)
 
 all:
 	go mod tidy
-	go build -ldflags '-extldflags "-fno-PIC -static" -X main.buildtime=${current_time}' -o uping
-	GOOS=linux GOARCH=arm64 go build -ldflags '-extldflags "-fno-PIC -static" -X main.buildtime=${current_time}' -o upingarm
+	CGO_ENABLED=0 go build -ldflags '-X main.buildtime=${current_time}' -o uping
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags '-X main.buildtime=${current_time}' -o upingarm
 
 # aarch64 compile
 arm:
-	GOOS=linux GOARCH=arm64 go build -ldflags '-extldflags "-fno-PIC -static"' -o upingarm
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags '-X main.buildtime=${current_time}' -o upingarm
 
 install: all
 	tar -zcvf uping.tar.gz uping upingarm

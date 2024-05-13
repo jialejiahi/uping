@@ -46,15 +46,17 @@ func SendOne(sindex int, c net.Conn, seq uint64, noWriteFlag bool, payload []byt
 	binary.Write(&buf, binary.BigEndian, &req)
 	binary.Write(&buf, binary.BigEndian, payload[:])
 
-	if Tcp && c != nil {
-	    if Ssl {
-		    tconn := c.(CustomTLSConn).GetOriginalConn().(*net.TCPConn)
-		    SetTcpConnQuickAck(tconn)
-		} else {
-		    SetTcpConnQuickAck(c.(*net.TCPConn))
-		}
-	}
 	if !noWriteFlag {
+		//if Tcp {
+		//	var tconn *net.TCPConn
+		//    if Ssl {
+		//	    tconn = c.(CustomTLSConn).GetOriginalConn().(*net.TCPConn)
+		//	} else {
+		//		tconn = c.(*net.TCPConn)
+		//	}
+		//	SetTcpConnQuickAck(tconn)
+		//}
+
 		c.SetWriteDeadline(time.Now().Add(time.Duration(Timeout) * time.Millisecond))
 		n, err = c.Write(buf.Bytes());
 		if err != nil {
@@ -99,6 +101,7 @@ func RecvOne(wg *sync.WaitGroup, sindex int, conn net.Conn, seq uint64) (err err
 		} else {
 		    tconn = conn.(*net.TCPConn)
 		}
+		SetTcpConnQuickAck(tconn)
 		tconn.SetReadDeadline(time.Now().Add(time.Duration(Timeout) * time.Millisecond))
 	} else {
 		uconn = conn.(*net.UDPConn)

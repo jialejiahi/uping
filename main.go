@@ -43,7 +43,7 @@ func init() {
 	flag.StringVar(&SPortList, "P", "23456,23457", "Server Data Port List")
 	flag.BoolVar(&Tcp, "T", false, "Use TCP Protocol, default false")
 	flag.BoolVar(&Ssl, "E", false, "Use SSL/TLS Protocol, default false")
-	flag.BoolVar(&NoDelay, "N", true, "Disable NoDelay on tcp sockets, default false")
+	flag.BoolVar(&NoDelay, "N", true, "Disable NoDelay on tcp sockets, default true")
 	flag.BoolVar(&EnableQuickAck, "Q", false, "Enable Quick Ack on tcp sockets, default false")
 
 	flag.BoolVar(&IsServer, "s", false, "Run as server, Server Only")

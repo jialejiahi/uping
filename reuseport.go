@@ -29,6 +29,9 @@ func ResolveAddr(network, address string) (net.Addr, error) {
 func SetTcpConnQuickAck(c *net.TCPConn) error {
 	rc, _ := c.SyscallConn()
 	rc.Control(func(fd uintptr) {
+		if Dbglvl > 1 {
+			fmt.Printf("SetsockoptInt on fd %v\n", fd)
+		}
 		if EnableQuickAck {
 			unix.SetsockoptInt(int(fd), unix.SOL_TCP, unix.TCP_QUICKACK, 1)
 		} else {
@@ -49,6 +52,10 @@ func SetTcpConnOptions(c *net.TCPConn) error {
 
 	rc, _ := c.SyscallConn()
 	rc.Control(func(fd uintptr) {
+
+		if Dbglvl > 1 {
+			fmt.Printf("SetsockoptInt on fd %v\n", fd)
+		}
 	    //决定了是否等待数据完整了再发送, 设置为1的话，一定会攒包，影响小包探测了
 		unix.SetsockoptInt(int(fd), unix.SOL_TCP, unix.TCP_CORK, 0)
 		//if DisableNoDelay {
@@ -62,11 +69,11 @@ func SetTcpConnOptions(c *net.TCPConn) error {
 	    // 决定了合适发送Ack， 开启了发送ack可能延迟，延迟到有数据发送或者定时器超时
 		//unix.SetsockoptInt(int(fd), unix.SOL_TCP, unix.TCP_QUICKACK, 0)
 		// 早设置一遍QuickAck
-		//if EnableQuickAck {
-		//	unix.SetsockoptInt(int(fd), unix.SOL_TCP, unix.TCP_QUICKACK, 1)
-		//} else {
-		//	unix.SetsockoptInt(int(fd), unix.SOL_TCP, unix.TCP_QUICKACK, 0)
-		//}
+		if EnableQuickAck {
+			unix.SetsockoptInt(int(fd), unix.SOL_TCP, unix.TCP_QUICKACK, 1)
+		} else {
+			unix.SetsockoptInt(int(fd), unix.SOL_TCP, unix.TCP_QUICKACK, 0)
+		}
 	})
 
 	return nil
@@ -83,6 +90,9 @@ func Control(network, address string, c syscall.RawConn) error {
 		err = unix.SetsockoptInt(int(fd), unix.SOL_SOCKET, unix.SO_REUSEPORT, 1)
 		if err != nil {
 			return
+		}
+		if Dbglvl > 1 {
+			fmt.Printf("SetsockoptInt on fd %v\n", fd)
 		}
 		if Tcp {
 		    if EnableQuickAck {
