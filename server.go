@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strconv"
 	"sync"
 	"syscall"
 )
@@ -74,11 +75,20 @@ func RecvAndSendOne(c net.Conn, buf []byte) (mutable bool, err error) {
 	if Dbglvl > 1 {
 		fmt.Printf("Req is %v, mutable bit is %v\n", req, mutable)
 	}
+	//append :port to Name
+	var lport int
+	if Tcp {
+		lport = tconn.LocalAddr().(*net.TCPAddr).Port
+	} else {
+		lport = uconn.LocalAddr().(*net.UDPAddr).Port
+	}
+	Namep := Name + ":" + strconv.Itoa(lport)
+
 	//make a reply
 	resp := RespHeader{
 		Id: req.Id,
 		Seq: req.Seq,
-		NameLen: uint32(len(Name)),
+		NameLen: uint32(len(Namep)),
 	}
 
 	if Dbglvl > 1 {
@@ -86,7 +96,7 @@ func RecvAndSendOne(c net.Conn, buf []byte) (mutable bool, err error) {
 	}
 	var rbuf bytes.Buffer
 	binary.Write(&rbuf, binary.BigEndian, &resp)
-	binary.Write(&rbuf, binary.BigEndian, []byte(Name))
+	binary.Write(&rbuf, binary.BigEndian, []byte(Namep))
 	if (n > int(16 + resp.NameLen)) {
 		binary.Write(&rbuf, binary.BigEndian, buf[16+resp.NameLen:n])
 	}
@@ -167,8 +177,8 @@ func server_main(saddr net.IP, plist []uint16) {
 	if Name == "" {
 		Name, _ = os.Hostname()
 	}
-	if len(Name) > 48 {
-		Name = Name[:48]	
+	if len(Name) > 42 {
+		Name = Name[:42]
 		fmt.Printf("Server name too long, truncated to %s\n", Name)
 	}
 	if Dbglvl > 0 {
