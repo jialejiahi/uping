@@ -151,42 +151,36 @@ func GetPortList(pliststr string) (plist []uint16, err error) {
 // sysctl -w net.core.somaxconn=1024
 // 关闭syn cookie
 // sysctl -w net.ipv4.tcp_syncookies=0
-func set_server_syn_backlog_cookie() {
-	f, err := os.OpenFile("/proc/sys/net/core/somaxconn", os.O_RDWR, 0)
+func write_proc_file(file_name string, value string) {
+	_, err := os.Stat(file_name)
 	if err != nil {
-		fmt.Printf("open /proc/sys/net/core/somaxconn error: %s", err.Error())
+		if os.IsNotExist(err) {
+			//fmt.Println("文件不存在")
+			return
+		} else {
+			//fmt.Println("发生错误:", err)
+			return
+		}
+	}
+	f, err := os.OpenFile(file_name, os.O_RDWR, 0)
+	if err != nil {
+		//fmt.Printf("open %s error: %s", file_name, err.Error())
 		return	
 	}
 	defer f.Close()
-	//default is 128
-	f.WriteString("1024")
+	f.WriteString(value)
+}
 
-	f, err = os.OpenFile("/proc/sys/net/ipv4/tcp_syncookies", os.O_RDWR, 0)
-	if err != nil {
-		fmt.Printf("open /proc/sys/net/ipv4/tcp_syncookies error: %s", err.Error())
-		return	
-	}
-	defer f.Close()
-	//default is 1
-	f.WriteString("0")
+func set_server_syn_backlog_cookie() {
+	write_proc_file("/proc/sys/net/core/somaxconn", "1024")
+
+	write_proc_file("/proc/sys/net/ipv4/tcp_syncookies", "0")
 }
 
 func set_socket_buf_size() {
-	f, err := os.OpenFile("/proc/sys/net/core/rmem_max", os.O_RDWR, 0)
-	if err != nil {
-		fmt.Printf("open /proc/sys/net/core/rmem_max error: %s", err.Error())
-		return	
-	}
-	defer f.Close()
-	f.WriteString("2097152")
+	write_proc_file("/proc/sys/net/core/rmem_max", "2097152")
 
-	f, err = os.OpenFile("/proc/sys/net/core/rmem_default", os.O_RDWR, 0)
-	if err != nil {
-		fmt.Printf("open /proc/sys/net/core/rmem_default error: %s", err.Error())
-		return	
-	}
-	defer f.Close()
-	f.WriteString("2097152")
+	write_proc_file("/proc/sys/net/core/rmem_default", "2097152")
 }
 
 func main() {
