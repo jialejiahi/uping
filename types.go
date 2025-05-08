@@ -57,7 +57,7 @@ type StatPerServer struct {
 	StatPerNames []StatPerName
 }
 
-const MaxPktLen = 9500
+const MaxPktLen = 65536
 const MinPktLen = 64
 
 type SeqError struct {

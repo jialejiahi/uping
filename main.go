@@ -29,6 +29,7 @@ var (
 	Tcp 	   bool //use tcp, default false
 	Ssl bool //use ssl, default false
 	Check	   bool //check request format on serverside, default false, Server Only
+	StrictCheck bool //client send request with fixed content, on server side, it means check the content
 	NoDelay bool      //disable nodelay on tcp sockets
 	EnableQuickAck bool      //enable quick ack on tcp sockets
 )
@@ -49,6 +50,7 @@ func init() {
 	flag.BoolVar(&IsServer, "s", false, "Run as server, Server Only")
 	flag.StringVar(&Name, "n", "", "Server Host Name, Get Host Name if it's not given, Server Only")
 	flag.BoolVar(&Check, "C", false, "Check request format on serverside, default false, Server Only")
+	flag.BoolVar(&StrictCheck, "S", false, "Strict check payload on serverside, send fix content on client side, default false")
 
 	flag.StringVar(&CAddr, "b", "0.0.0.0", "Client Binding Address, Client Only")
 	flag.IntVar(&CPort, "p", 0, "Client Binding Port, Client Only")
@@ -100,6 +102,9 @@ func Usage() {
   -C bool
         Check Request format on serverside (default false)
         服务端收包时是否检查请求格式
+  -S bool
+        Send fix content from client and Check payload on serverside (default false)
+        严格检查: 客户端设置时发固定payload内容, 服务端设置时检查payload内容是否正确
   -b string
         Client Binding Address, Client Only (default "0.0.0.0")
         client端绑定的地址, 不指定则不绑定

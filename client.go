@@ -36,7 +36,7 @@ func get_stat_for_name(server_index int, name string) int {
 }
 
 //construct and send one packet
-func SendOne(sindex int, c net.Conn, seq uint64, noWriteFlag bool, payload []byte) (err error) {
+func SendOne(sindex int, c net.Conn, seq uint64, noWriteFlag bool, connectTime time.Time, payload []byte) (err error) {
 	var buf bytes.Buffer
 	var n int
 	req := ReqHeader {
@@ -44,6 +44,11 @@ func SendOne(sindex int, c net.Conn, seq uint64, noWriteFlag bool, payload []byt
 		Seq: seq,
 	}
 	binary.Write(&buf, binary.BigEndian, &req)
+	if StrictCheck {
+		for i := 0; i < len(payload); i++ {
+			payload[i] = byte(seq%256)
+		}
+	}
 	binary.Write(&buf, binary.BigEndian, payload[:])
 
 	if !noWriteFlag {
@@ -68,6 +73,9 @@ func SendOne(sindex int, c net.Conn, seq uint64, noWriteFlag bool, payload []byt
 		err = nil
 	}
 	timeStamp := time.Now()
+	if MutCT && Tcp {
+		timeStamp = connectTime
+	}
 	if seq >= uint64(len(serverStatSlice[sindex].ReqStats)) {
 		fmt.Printf("send seq out of range: seq=%d, len=%d, server index=%d, remote=%v\n",
 			seq, len(serverStatSlice[sindex].ReqStats), sindex, c.RemoteAddr())
@@ -347,8 +355,9 @@ func SendAndRecvPerServer(wg *sync.WaitGroup, caddr net.IP, sindex int) {
 	}
 	var RealLen int = PayloadLen
 	var payload = make([]byte, RealLen-12)
-	rand.Read(payload[:])
-
+	if !StrictCheck {
+		rand.Read(payload[:])
+	}
 	var wg1 sync.WaitGroup
 	for seq < Count {
 		if Interrupted {
@@ -369,6 +378,9 @@ func SendAndRecvPerServer(wg *sync.WaitGroup, caddr net.IP, sindex int) {
 		})
 		serverStatSlice[sindex].ReqLock.Unlock()
 
+		//only used when it's MutCT and Tcp, in this case we calculate with RTT = payload_receive_time - syn_send_time
+		//otherwise,  RTT = payload_receive_time - payload_send_time
+		var connectTime time.Time
 		if MutCT {
 			// c, err = net.DialUDP("udp", &net.UDPAddr{IP: caddr },
 				//   &net.UDPAddr{IP: serverStatSlice[sindex].Saddr, Port: serverStatSlice[sindex].Sport})	
@@ -385,7 +397,7 @@ func SendAndRecvPerServer(wg *sync.WaitGroup, caddr net.IP, sindex int) {
 				if err != nil {
 					fmt.Printf("seq = %d, dial error: %s\n", seq, err)
 					//dial fail, save a req stat because we tried, fake send
-					SendOne(sindex, c, seq, true, payload)
+					SendOne(sindex, c, seq, true, time.Time{}, payload)
 					seq++
 					delay()
 					continue
@@ -399,6 +411,7 @@ func SendAndRecvPerServer(wg *sync.WaitGroup, caddr net.IP, sindex int) {
 			        laddr = &net.TCPAddr{IP: caddr, Port: CPort}
 			    }
 				//for tcp short connection, timeout should not be too short, multiple it with 10
+				connectTime = time.Now()
 				if Interval < 10 {
 					c, err = Dial("tcp", laddr.String(), raddr.String(), time.Duration(Interval * 10), Ssl)
 				} else {
@@ -407,7 +420,7 @@ func SendAndRecvPerServer(wg *sync.WaitGroup, caddr net.IP, sindex int) {
 				if err != nil {
 					fmt.Printf("seq = %d, dial error: %s\n", seq, err)
 					//dial fail, save a req stat because we tried, fake send
-					SendOne(sindex, c, seq, true, payload)
+					SendOne(sindex, c, seq, true, connectTime, payload)
 					seq++
 					delay()
 					continue
@@ -421,9 +434,8 @@ func SendAndRecvPerServer(wg *sync.WaitGroup, caddr net.IP, sindex int) {
 			}
 			defer c.Close()
 		}
-
 		//send_and_recv()
-		err = SendOne(sindex, c, seq, false, payload)
+		err = SendOne(sindex, c, seq, false, connectTime, payload)
 		if Tcp {
 			if errors.Is(err, syscall.EPIPE) || errors.Is(err, syscall.ECONNRESET) {
 				if MutCT {
@@ -452,7 +464,9 @@ func SendAndRecvPerServer(wg *sync.WaitGroup, caddr net.IP, sindex int) {
 				RealLen = PayloadLen
 			}
 			payload = make([]byte, RealLen-12)
-			rand.Read(payload[:])
+			if !StrictCheck {
+				rand.Read(payload[:])
+			}
 		}
 	}
 	wg1.Wait()

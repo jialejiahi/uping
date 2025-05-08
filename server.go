@@ -66,6 +66,16 @@ func RecvAndSendOne(c net.Conn, buf []byte) (mutable bool, err error) {
 			return
 		}
 	}
+	if StrictCheck {
+		//the payload content is fixed "seq%256", let's check it
+
+		for i := 12; i < n; i++ {
+			if buf[i] != byte(req.Seq % 256) {
+				fmt.Printf("Seq %d check payload failed at byte %d, expected %d<->real %d\n", req.Seq, i, req.Seq%256, buf[i])
+				return
+			}
+		}
+	}
 	if req.Id & 0x00000001 != 0 {
 		//mutable
 		mutable = true
