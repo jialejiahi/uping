@@ -85,7 +85,7 @@ func SendOne(sindex int, c net.Conn, seq uint64, noWriteFlag bool, connectTime t
 	serverStatSlice[sindex].ReqLock.Lock()
 	serverStatSlice[sindex].ReqStats[seq].TimeStamp = timeStamp
 	serverStatSlice[sindex].ReqLock.Unlock()
-	if Dbglvl > 1 {
+	if Dbglvl > 1 && !noWriteFlag {
 		fmt.Printf("Sent %d bytes to %s: seq=%d timestamp=%s\n",
 			n, c.RemoteAddr().String(), seq, timeStamp.Format(time.StampMilli))
 	}
