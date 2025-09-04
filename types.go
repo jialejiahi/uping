@@ -59,6 +59,7 @@ type StatPerServer struct {
 
 const MaxPktLen = 65536
 const MinPktLen = 64
+const MaxLostRecord = 100
 
 type SeqError struct {
     Msg string

@@ -228,7 +228,7 @@ func get_all_stats() {
 				}
 				s.RespNum++
 			} else {
-				if len(lostSeqs) < 5 {
+				if len(lostSeqs) < MaxLostRecord {
 					lostSeqs = append(lostSeqs, reqStat.Seq)
 				}
 				if Dbglvl > 1 {
@@ -252,7 +252,7 @@ func get_all_stats() {
 				fmt.Printf("send/recv packets number may not match if tcp mutable ct(-m) is not set!\n")
 			}
 			fmt.Printf("estimate network failure time: %s\n", time.Duration(s.LostNum) * time.Duration(Interval) * time.Millisecond)
-			fmt.Printf("print at most 5 no-response packet sequences and their send timestamps:\n")
+			fmt.Printf("print at most %d no-response packet sequences and their send timestamps:\n", MaxLostRecord)
 			for _, seq := range lostSeqs {
 				fmt.Printf("no-response packet seq=%d timestamp=%v\n", seq, s.ReqStats[seq].TimeStamp)
 			}
